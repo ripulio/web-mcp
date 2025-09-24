@@ -18,6 +18,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Install Browser
+        run: npx playwright install chromium
       - run: npm run lint
       - run: npm test
   build:

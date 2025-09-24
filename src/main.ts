@@ -1,15 +1,15 @@
-interface ToolDefinition {
+export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: unknown;
   execute: (input: unknown) => Promise<unknown>;
 }
 
-interface AgentContext {
+export interface AgentContext {
   tools?: ToolDefinition[];
 }
 
-interface Agent {
+export interface Agent {
   provideContext(context: AgentContext): void;
 }
 
@@ -82,32 +82,4 @@ window.addEventListener('toolcall', async (event) => {
       error: (error as Error).message
     });
   }
-});
-
-window.agent.provideContext({
-  tools: [
-    {
-      name: 'add-todo',
-      description: 'Add a new todo item to the list',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          text: {type: 'string', description: 'The text of the todo item'}
-        },
-        required: ['text']
-      },
-      async execute(input) {
-        console.log(input);
-      }
-    },
-    {
-      name: 'list-todos',
-      description: 'List all todo items',
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      },
-      async execute() {}
-    }
-  ]
 });
