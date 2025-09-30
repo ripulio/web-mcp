@@ -5,12 +5,8 @@ export interface ToolDefinition {
   execute: (input: unknown) => Promise<unknown>;
 }
 
-export interface AgentContext {
-  tools?: ToolDefinition[];
-}
-
 export interface Agent {
-  provideContext(context: AgentContext): void;
+  tools: AgentToolRegistry;
 }
 
 export class ToolCallEvent extends Event {
@@ -37,6 +33,7 @@ export class ToolCallEvent extends Event {
 declare global {
   interface Window {
     agent: Agent;
+    ToolCallEvent: typeof ToolCallEvent;
   }
 
   interface WindowEventMap {
@@ -44,20 +41,44 @@ declare global {
   }
 }
 
-const tools = new Map<string, ToolDefinition>();
+class AgentToolRegistry {
+  #tools: Map<string, ToolDefinition> = new Map();
+  #resolvers: Map<string, Array<(tool: ToolDefinition) => void>> = new Map();
 
-function provideContext(context: AgentContext) {
-  if (context.tools) {
-    for (const tool of context.tools) {
-      tools.set(tool.name, tool);
+  define(tool: ToolDefinition) {
+    this.#tools.set(tool.name, tool);
+    const resolvers = this.#resolvers.get(tool.name);
+    if (resolvers) {
+      for (const resolve of resolvers) {
+        resolve(tool);
+      }
+      this.#resolvers.delete(tool.name);
     }
+  }
+
+  get(name: string): ToolDefinition | undefined {
+    return this.#tools.get(name);
+  }
+
+  whenDefined(name: string): Promise<ToolDefinition> {
+    return new Promise((resolve) => {
+      const tool = this.#tools.get(name);
+      if (tool) {
+        resolve(tool);
+        return;
+      }
+      const resolvers = this.#resolvers.get(name) ?? [];
+      resolvers.push(resolve);
+      this.#resolvers.set(name, resolvers);
+    });
   }
 }
 
 if (!window.agent) {
   window.agent = {
-    provideContext
+    tools: new AgentToolRegistry()
   };
+  window.ToolCallEvent = ToolCallEvent;
 }
 
 window.addEventListener('toolcall', async (event) => {
@@ -65,7 +86,7 @@ window.addEventListener('toolcall', async (event) => {
     return;
   }
 
-  const tool = tools.get(event.name);
+  const tool = window.agent.tools.get(event.name);
   if (!tool) {
     event.respondWith({
       error: `Tool not found: ${event.name}`
