@@ -5,6 +5,8 @@ export interface ToolDefinition {
   execute: (input: unknown) => Promise<unknown>;
 }
 
+export type ToolDefinitionInfo = Omit<ToolDefinition, 'execute'>;
+
 export interface Agent {
   tools: AgentToolRegistry;
 }
@@ -45,8 +47,11 @@ class AgentToolRegistry {
   #tools: Map<string, ToolDefinition> = new Map();
   #resolvers: Map<string, Array<(tool: ToolDefinition) => void>> = new Map();
 
-  list(): Iterable<ToolDefinition> {
-    return this.#tools.values();
+  *list(): Iterable<ToolDefinitionInfo> {
+    for (const tool of this.#tools.values()) {
+      const {execute, ...info} = tool;
+      yield info;
+    }
   }
 
   define(tool: ToolDefinition) {
