@@ -1,44 +1,25 @@
 {
-  "name": "@ripul/web-mcp",
-  "version": "0.0.1",
-  "description": "A WebMCP implementation.",
-  "files": [
-    "lib"
-  ],
-  "keywords": [
-    "webmcp",
-    "mcp",
-    "web"
-  ],
-  "homepage": "https://github.com/ripulio/web-mcp#readme",
-  "bugs": {
-    "url": "https://github.com/ripulio/web-mcp/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ripulio/web-mcp.git"
-  },
-  "license": "MIT",
-  "author": "James Garbutt (https://github.com/43081j)",
+  "name": "@ripul/web-mcp-monorepo",
   "type": "module",
-  "main": "lib/main.js",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc",
-    "format": "prettier --write src test",
-    "lint": "npm run lint:format && npm run lint:js && npm run lint:test-types",
-    "lint:format": "prettier --check src test",
-    "lint:js": "eslint src test",
-    "lint:test-types": "tsc -p tsconfig.test.json",
-    "test": "vitest"
+    "build": "npm run --workspaces build",
+    "test": "npm run --workspaces test",
+    "lint": "npm run lint:format && npm run lint:js",
+    "format": "prettier --write \"packages/*/{test,src}/**/*.ts\"",
+    "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\"",
+    "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\""
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@vitest/browser": "^3.2.4",
     "eslint": "^9.36.0",
     "globals": "^16.4.0",
+    "@vitest/browser": "^3.2.4",
     "playwright": "^1.55.1",
     "prettier": "^3.6.2",
-    "typescript": "^5.9.2",
     "typescript-eslint": "^8.44.1",
     "vitest": "^3.2.4"
   }

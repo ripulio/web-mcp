@@ -1,0 +1,36 @@
+{
+  "name": "@ripul/web-mcp",
+  "version": "0.0.1",
+  "description": "A WebMCP implementation.",
+  "files": [
+    "lib"
+  ],
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "web"
+  ],
+  "homepage": "https://github.com/ripulio/web-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/ripulio/web-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ripulio/web-mcp.git"
+  },
+  "license": "MIT",
+  "author": "James Garbutt (https://github.com/43081j)",
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "build:typecheck": "tsc -p tsconfig.test.json",
+    "build:js": "tsc",
+    "build": "npm run build:typecheck && npm run build:js",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+  }
+}

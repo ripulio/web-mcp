@@ -45,6 +45,10 @@ class AgentToolRegistry {
   #tools: Map<string, ToolDefinition> = new Map();
   #resolvers: Map<string, Array<(tool: ToolDefinition) => void>> = new Map();
 
+  list(): Iterable<ToolDefinition> {
+    return this.#tools.values();
+  }
+
   define(tool: ToolDefinition) {
     this.#tools.set(tool.name, tool);
     const resolvers = this.#resolvers.get(tool.name);

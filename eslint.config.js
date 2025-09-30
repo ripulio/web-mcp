@@ -5,7 +5,7 @@ import globals from "globals";
 
 export default defineConfig([
   {
-    files: ['src/**/*.ts', 'test/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'packages/*/test/**/*.ts'],
     plugins: {
       eslint: eslintjs,
       typescript: tseslint

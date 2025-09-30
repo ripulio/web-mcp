@@ -18,7 +18,7 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.provideContext({tools: [toolDefinition]});
+    window.agent.tools.define(toolDefinition);
 
     const toolCallEvent = new ToolCallEvent(
       'echo',
@@ -58,7 +58,7 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.provideContext({tools: [toolDefinition]});
+    window.agent.tools.define(toolDefinition);
 
     const respondWith = vi.fn().mockImplementation(() => {
       return;
@@ -89,7 +89,7 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.provideContext({tools: [toolDefinition]});
+    window.agent.tools.define(toolDefinition);
 
     const respondWith = vi.fn();
     const toolCallEvent = new ToolCallEvent('successfulTool', {}, respondWith);
