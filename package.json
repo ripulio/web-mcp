@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "build": "npm run --workspaces build",
-    "test": "npm run --workspaces test",
+    "test": "vitest run",
     "lint": "npm run lint:format && npm run lint:js",
     "format": "prettier --write \"packages/*/{test,src}/**/*.ts\"",
     "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\"",
