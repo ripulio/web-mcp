@@ -59,16 +59,8 @@ async function registerWebPage(url: string) {
     await page.goto(url, {waitUntil: 'networkidle0'});
 
     const tools = await page.evaluate(() => {
-      const tools = window.agent.tools.list();
-      const result = [];
-      for (const tool of tools) {
-        result.push({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema
-        });
-      }
-      return result;
+      const tools = [...window.agent.tools.list()];
+      return tools;
     });
 
     webToolsRegistry.set(url, tools);

@@ -1,101 +1,108 @@
 import {render} from 'preact';
-import {useState} from 'preact/hooks';
+import {useState, useEffect} from 'preact/hooks';
+import {type ToolDefinitionInfo} from '@ripul/web-mcp';
 
-const mockTools = [
-  {
-    name: 'search',
-    description: 'Search the page content for specific text or patterns',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {type: 'string', description: 'Search query'},
-        caseSensitive: {type: 'boolean', description: 'Case sensitive search'}
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'extract_links',
-    description: 'Extract all links from the current page',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        includeInternal: {
-          type: 'boolean',
-          description: 'Include internal links'
-        },
-        includeExternal: {
-          type: 'boolean',
-          description: 'Include external links'
+// Fetch tools from the current tab
+async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval<ToolDefinitionInfo[]>(
+      `(function() {
+        try {
+          if (window.agent) {
+            const tools = [...window.agent.tools.list()];
+            return tools;
+          }
+          return [];
+        } catch (e) {
+          return [];
+        }
+      })()`,
+      (result, isException) => {
+        if (isException || !result) {
+          resolve([]);
+        } else {
+          resolve(result);
         }
       }
-    }
-  },
-  {
-    name: 'get_metadata',
-    description:
-      'Get metadata from the page including title, description, and OpenGraph tags',
-    inputSchema: {
-      type: 'object',
-      properties: {}
-    }
-  },
-  {
-    name: 'extract_tables',
-    description: 'Extract table data from the page in structured format',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        selector: {
-          type: 'string',
-          description: 'CSS selector for specific tables'
-        },
-        format: {
-          type: 'string',
-          enum: ['json', 'csv'],
-          description: 'Output format'
-        }
-      }
-    }
-  },
-  {
-    name: 'screenshot',
-    description:
-      'Capture a screenshot of the current page or a specific element',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        selector: {
-          type: 'string',
-          description: 'CSS selector for element to capture'
-        },
-        fullPage: {type: 'boolean', description: 'Capture full page'}
-      }
-    }
-  }
-];
-
-// Mock tool execution function
-async function executeTool(_toolName: string, _params: unknown): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+    );
+  });
 }
 
-function ToolRow({tool}: {tool: (typeof mockTools)[0]}) {
+async function executeTool(
+  toolName: string,
+  params: unknown
+): Promise<unknown> {
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(
+      `(function() {
+        return new Promise((resolve) => {
+          window.dispatchEvent(
+            new window.ToolCallEvent(${JSON.stringify(String(toolName))}, ${JSON.stringify(params)}, resolve)
+          );
+        });
+      })()`,
+      (result, isException) => {
+        if (isException) {
+          resolve({error: 'Tool execution failed'});
+        } else {
+          resolve(result);
+        }
+      }
+    );
+  });
+}
+
+function ToolForm({
+  onCancel,
+  onExecute
+}: {
+  onCancel: () => void;
+  onExecute: () => void;
+}) {
+  return (
+    <div className="tool-form">
+      <div className="form-field">
+        <label>Text Input:</label>
+        <input type="text" placeholder="Enter value" />
+      </div>
+      <div className="form-field">
+        <label>
+          <input type="checkbox" />
+          Checkbox option
+        </label>
+      </div>
+      <div className="form-actions">
+        <button onClick={onCancel} className="cancel-button">
+          Cancel
+        </button>
+        <button onClick={onExecute} className="tool-run-button">
+          Run
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [result, setResult] = useState<unknown>(null);
 
   const handleRunClick = () => {
     setIsExpanded(true);
+    setResult(null);
   };
 
   const handleCancel = () => {
     setIsExpanded(false);
+    setResult(null);
   };
 
   const handleExecute = async () => {
     setIsExecuting(true);
     try {
-      await executeTool(tool.name, {});
+      const toolResult = await executeTool(tool.name, {});
+      setResult(toolResult);
     } finally {
       setIsExecuting(false);
       setIsExpanded(false);
@@ -117,32 +124,23 @@ function ToolRow({tool}: {tool: (typeof mockTools)[0]}) {
       </div>
 
       {isExpanded && (
-        <div className="tool-form">
-          {/* Mock form */}
-          <div className="form-field">
-            <label>Text Input:</label>
-            <input type="text" placeholder="Enter value" />
-          </div>
-          <div className="form-field">
-            <label>
-              <input type="checkbox" />
-              Checkbox option
-            </label>
-          </div>
-          <div className="form-actions">
-            <button onClick={handleCancel} className="cancel-button">
-              Cancel
-            </button>
-            <button onClick={handleExecute} className="tool-run-button">
-              Run
-            </button>
-          </div>
-        </div>
+        <ToolForm onCancel={handleCancel} onExecute={handleExecute} />
       )}
 
       {isExecuting && (
         <div className="spinner-overlay">
           <div className="spinner"></div>
+        </div>
+      )}
+
+      {result && (
+        <div className="tool-result">
+          <label>Result:</label>
+          <textarea
+            readOnly
+            value={JSON.stringify(result, null, 2)}
+            rows={10}
+          />
         </div>
       )}
     </div>
@@ -151,7 +149,16 @@ function ToolRow({tool}: {tool: (typeof mockTools)[0]}) {
 
 function Panel() {
   const [activeNav, setActiveNav] = useState('tools');
-  const tools = mockTools; // TODO: Replace with actual tools from the page
+  const [tools, setTools] = useState<ToolDefinitionInfo[]>([]);
+
+  useEffect(() => {
+    loadTools();
+  }, []);
+
+  const loadTools = async () => {
+    const fetchedTools = await fetchToolsFromTab();
+    setTools(fetchedTools);
+  };
 
   return (
     <div className="panel-container">
@@ -198,13 +205,7 @@ if (chrome.devtools) {
 }
 
 function renderTools() {
-  const errorEl = document.getElementById('error');
   const rootEl = document.getElementById('root');
-
-  if (errorEl) {
-    errorEl.style.display = 'none';
-  }
-
   if (rootEl) {
     render(<Panel />, rootEl);
   }
