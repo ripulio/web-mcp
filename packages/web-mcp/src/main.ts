@@ -1,8 +1,12 @@
+import type {CallToolResult} from './mcp-types.js';
+
+export type {CallToolResult};
+
 export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: unknown;
-  execute: (input: unknown) => Promise<unknown>;
+  execute: (input: unknown) => Promise<CallToolResult>;
 }
 
 export type ToolDefinitionInfo = Omit<ToolDefinition, 'execute'>;
@@ -14,12 +18,12 @@ export interface Agent {
 export class ToolCallEvent extends Event {
   name: string;
   args: unknown;
-  #callback: (result: unknown) => void;
+  #callback: (result: CallToolResult) => void;
 
   constructor(
     name: string,
     args: unknown,
-    callback: (result: unknown) => void
+    callback: (result: CallToolResult) => void
   ) {
     super('toolcall');
     this.name = name;
@@ -27,7 +31,7 @@ export class ToolCallEvent extends Event {
     this.#callback = callback;
   }
 
-  respondWith(result: unknown) {
+  respondWith(result: CallToolResult) {
     this.#callback(result);
   }
 }
@@ -98,18 +102,28 @@ window.addEventListener('toolcall', async (event) => {
   const tool = window.agent.tools.get(event.name);
   if (!tool) {
     event.respondWith({
-      error: `Tool not found: ${event.name}`
+      content: [
+        {
+          type: 'text',
+          text: `Tool not found: ${event.name}`
+        }
+      ],
+      isError: true
     });
     return;
   }
   try {
     const result = await tool.execute(event.args);
-    event.respondWith({
-      result
-    });
+    event.respondWith(result);
   } catch (error) {
     event.respondWith({
-      error: (error as Error).message
+      content: [
+        {
+          type: 'text',
+          text: `Error executing tool ${event.name}: ${(error as Error).message}`
+        }
+      ],
+      isError: true
     });
   }
 });
