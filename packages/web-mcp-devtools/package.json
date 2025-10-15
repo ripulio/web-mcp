@@ -1,0 +1,31 @@
+{
+  "name": "@ripul/web-mcp-devtools",
+  "version": "0.0.1",
+  "description": "A Chrome DevTools extension for Web MCP.",
+  "homepage": "https://github.com/ripulio/web-mcp#readme",
+  "files": [
+    "lib"
+  ],
+  "bugs": {
+    "url": "https://github.com/ripulio/web-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ripulio/web-mcp.git"
+  },
+  "license": "MIT",
+  "author": "James Garbutt (https://github.com/43081j)",
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "build:typecheck": "tsc -p tsconfig.test.json",
+    "build:js": "node scripts/build.js",
+    "build": "npm run build:typecheck && npm run build:js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@ripul/web-mcp": "^0.0.1",
+    "esbuild": "^0.25.11",
+    "typescript": "^5.9.2"
+  }
+}
