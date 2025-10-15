@@ -44,6 +44,23 @@ async function build() {
     });
     console.log('✓ Built background.js');
 
+    // Build content.ts
+    await esbuild.build({
+      ...commonConfig,
+      format: 'iife',
+      entryPoints: [join(srcDir, 'content.ts')],
+      outfile: join(extensionDir, 'content.js')
+    });
+    console.log('✓ Built content.js');
+
+    // Build bridge.ts
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(srcDir, 'bridge.ts')],
+      outfile: join(extensionDir, 'bridge.js')
+    });
+    console.log('✓ Built bridge.js');
+
     // Build styles
     await esbuild.build({
       ...commonConfig,

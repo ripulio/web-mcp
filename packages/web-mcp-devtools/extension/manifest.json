@@ -5,14 +5,16 @@
   "description": "Debug and inspect WebMCP tools in your browser.",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
-  "content_scripts": [
-  ],
   "devtools_page": "devtools.html",
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "web_accessible_resources": [
+    {
+      "resources": ["bridge.js"],
+      "matches": ["<all_urls>"]
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"

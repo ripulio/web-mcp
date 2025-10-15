@@ -1,81 +1,218 @@
 import {render} from 'preact';
 import {useState, useEffect} from 'preact/hooks';
 import {type ToolDefinitionInfo} from '@ripul/web-mcp';
+import {dset} from 'dset';
 
-// Fetch tools from the current tab
+async function ensureContentScript(): Promise<void> {
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  try {
+    await chrome.tabs.sendMessage(tabId, {type: 'PING'});
+  } catch {
+    await chrome.scripting.executeScript({
+      target: {tabId},
+      files: ['content.js']
+    });
+  }
+}
+
 async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval<ToolDefinitionInfo[]>(
-      `(function() {
-        try {
-          if (window.agent) {
-            const tools = [...window.agent.tools.list()];
-            return tools;
-          }
-          return [];
-        } catch (e) {
-          return [];
-        }
-      })()`,
-      (result, isException) => {
-        if (isException || !result) {
-          resolve([]);
-        } else {
-          resolve(result);
-        }
-      }
-    );
-  });
+  await ensureContentScript();
+
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  const response = await chrome.tabs.sendMessage(tabId, {type: 'FETCH_TOOLS'});
+
+  if (chrome.runtime.lastError) {
+    return [];
+  }
+
+  return response.tools;
 }
 
 async function executeTool(
   toolName: string,
   params: unknown
 ): Promise<unknown> {
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(
-      `(function() {
-        return new Promise((resolve) => {
-          window.dispatchEvent(
-            new window.ToolCallEvent(${JSON.stringify(String(toolName))}, ${JSON.stringify(params)}, resolve)
-          );
-        });
-      })()`,
-      (result, isException) => {
-        if (isException) {
-          resolve({error: 'Tool execution failed'});
-        } else {
-          resolve(result);
-        }
-      }
-    );
+  await ensureContentScript();
+
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: 'EXECUTE_TOOL',
+    toolName,
+    params
   });
+
+  if (chrome.runtime.lastError) {
+    return {error: chrome.runtime.lastError.message};
+  }
+
+  return response?.result;
+}
+
+interface StringSchemaLike {
+  type: 'string';
+  description?: string;
+}
+
+interface NumberSchemaLike {
+  type: 'number';
+  description?: string;
+}
+
+interface BooleanSchemaLike {
+  type: 'boolean';
+  description?: string;
+}
+
+interface ObjectSchemaLike {
+  type: 'object';
+  properties: Record<string, SchemaLike>;
+  required?: string[];
+  description?: string;
+}
+
+interface ArraySchemaLike {
+  type: 'array';
+  items: SchemaLike;
+  description?: string;
+}
+
+type SchemaLike =
+  | StringSchemaLike
+  | NumberSchemaLike
+  | BooleanSchemaLike
+  | ObjectSchemaLike
+  | ArraySchemaLike;
+
+function ToolFormSchema({
+  schema,
+  value,
+  onChange,
+  path = []
+}: {
+  schema: unknown;
+  value: unknown;
+  onChange: (path: string[], newValue: unknown) => void;
+  path?: string[];
+}) {
+  if (typeof schema !== 'object' || schema === null) {
+    return null;
+  }
+
+  const asSchema = schema as SchemaLike;
+
+  switch (asSchema.type) {
+    case 'string':
+      return (
+        <div className="form-field">
+          {asSchema.description && <label>{asSchema.description}</label>}
+          <input
+            type="text"
+            placeholder="Enter text"
+            value={(value as string) ?? ''}
+            onInput={(e) =>
+              onChange(path, (e.target as HTMLInputElement).value)
+            }
+          />
+        </div>
+      );
+    case 'number':
+      return (
+        <div className="form-field">
+          {asSchema.description && <label>{asSchema.description}</label>}
+          <input
+            type="number"
+            placeholder="Enter number"
+            value={(value as number) ?? ''}
+            onInput={(e) =>
+              onChange(path, parseFloat((e.target as HTMLInputElement).value))
+            }
+          />
+        </div>
+      );
+    case 'boolean':
+      return (
+        <div className="form-field">
+          <label>
+            <input
+              type="checkbox"
+              checked={(value as boolean) ?? false}
+              onChange={(e) =>
+                onChange(path, (e.target as HTMLInputElement).checked)
+              }
+            />
+            {asSchema.description ?? ''}
+          </label>
+        </div>
+      );
+    case 'object':
+      return (
+        <div className="form-object">
+          {asSchema.description && (
+            <div className="form-description">{asSchema.description}</div>
+          )}
+          {Object.entries(asSchema.properties).map(([key, propSchema]) => (
+            <div key={key}>
+              <h3>{key}</h3>
+              <ToolFormSchema
+                schema={propSchema}
+                value={(value as Record<string, unknown>)?.[key]}
+                onChange={onChange}
+                path={[...path, key]}
+              />
+            </div>
+          ))}
+        </div>
+      );
+    case 'array':
+      return (
+        <div className="form-field">
+          {asSchema.description && <label>{asSchema.description}</label>}
+          TODO
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 function ToolForm({
+  tool,
   onCancel,
   onExecute
 }: {
+  tool: ToolDefinitionInfo;
   onCancel: () => void;
-  onExecute: () => void;
+  onExecute: (params: unknown) => void;
 }) {
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
+
+  const handleChange = (path: string[], newValue: unknown) => {
+    setFormData((prev) => {
+      const updated = {...prev};
+      dset(updated, path.join('.'), newValue);
+      return updated;
+    });
+  };
+
+  const handleExecute = () => {
+    onExecute(formData);
+  };
+
   return (
     <div className="tool-form">
-      <div className="form-field">
-        <label>Text Input:</label>
-        <input type="text" placeholder="Enter value" />
-      </div>
-      <div className="form-field">
-        <label>
-          <input type="checkbox" />
-          Checkbox option
-        </label>
-      </div>
+      <ToolFormSchema
+        schema={tool.inputSchema}
+        value={formData}
+        onChange={handleChange}
+      />
       <div className="form-actions">
         <button onClick={onCancel} className="cancel-button">
           Cancel
         </button>
-        <button onClick={onExecute} className="tool-run-button">
+        <button onClick={handleExecute} className="tool-run-button">
           Run
         </button>
       </div>
@@ -98,10 +235,10 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
     setResult(null);
   };
 
-  const handleExecute = async () => {
+  const handleExecute = async (params: unknown) => {
     setIsExecuting(true);
     try {
-      const toolResult = await executeTool(tool.name, {});
+      const toolResult = await executeTool(tool.name, params);
       setResult(toolResult);
     } finally {
       setIsExecuting(false);
@@ -124,7 +261,11 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
       </div>
 
       {isExpanded && (
-        <ToolForm onCancel={handleCancel} onExecute={handleExecute} />
+        <ToolForm
+          tool={tool}
+          onCancel={handleCancel}
+          onExecute={handleExecute}
+        />
       )}
 
       {isExecuting && (
