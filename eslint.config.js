@@ -5,7 +5,7 @@ import globals from "globals";
 
 export default defineConfig([
   {
-    files: ['packages/*/src/**/*.ts', 'packages/*/test/**/*.ts'],
+    files: ['packages/*/src/**/*.{ts,tsx}', 'packages/*/test/**/*.{ts,tsx}'],
     plugins: {
       eslint: eslintjs,
       typescript: tseslint
@@ -24,4 +24,12 @@ export default defineConfig([
       eslintjs.configs.recommended
     ]
   },
+  {
+    files: ['packages/web-mcp-devtools/{src,test}/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        chrome: 'readonly'
+      }
+    }
+  }
 ]);
