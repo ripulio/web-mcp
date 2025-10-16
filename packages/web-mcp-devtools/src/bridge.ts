@@ -52,4 +52,35 @@ window.addEventListener('message', (event: MessageEvent) => {
   }
 });
 
+// Listen for toolcall events in the page context and relay them to content script
+window.addEventListener(
+  'toolcall',
+  (event) => {
+    window.postMessage(
+      {
+        type: 'TOOLCALL_EVENT',
+        timestamp: Date.now(),
+        toolName: event.name,
+        params: event.args
+      },
+      '*'
+    );
+
+    // Wrap respondWith to capture the result
+    const originalRespondWith = event.respondWith.bind(event);
+    event.respondWith = (result) => {
+      window.postMessage(
+        {
+          type: 'TOOLCALL_RESULT',
+          toolName: event.name,
+          result: result
+        },
+        '*'
+      );
+      originalRespondWith(result);
+    };
+  },
+  true
+); // Use capture phase to intercept before other handlers
+
 window.postMessage({type: 'WEBMCP_BRIDGE_READY'}, '*');

@@ -2,6 +2,7 @@ import {render} from 'preact';
 import {useState, useEffect} from 'preact/hooks';
 import {type ToolDefinitionInfo} from '@ripul/web-mcp';
 import {dset} from 'dset';
+import type {ToolCallEventInfo} from './types.js';
 
 async function ensureContentScript(): Promise<void> {
   const tabId = chrome.devtools.inspectedWindow.tabId;
@@ -49,6 +50,20 @@ async function executeTool(
   }
 
   return response?.result;
+}
+
+async function fetchEventsFromTab(): Promise<ToolCallEventInfo[]> {
+  await ensureContentScript();
+
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  const response = await chrome.tabs.sendMessage(tabId, {type: 'FETCH_EVENTS'});
+
+  if (chrome.runtime.lastError) {
+    return [];
+  }
+
+  return response.events || [];
 }
 
 interface StringSchemaLike {
@@ -288,6 +303,77 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
   );
 }
 
+function EventRow({event}: {event: ToolCallEventInfo}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString();
+  };
+
+  return (
+    <div className="list-row">
+      <div
+        className="list-row-header clickable"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="list-row-time">{formatTimestamp(event.timestamp)}</div>
+        <div className="list-row-title">{event.toolName}</div>
+        <div className="list-row-expand">{isExpanded ? '▼' : '▶'}</div>
+      </div>
+      {isExpanded && (
+        <div className="list-row-details">
+          <div className="detail-section">
+            <label>Parameters:</label>
+            <textarea
+              readOnly
+              value={JSON.stringify(event.params, null, 2)}
+              rows={5}
+            />
+          </div>
+          {event.result && (
+            <div className="detail-section">
+              <label>Result:</label>
+              <textarea
+                readOnly
+                value={JSON.stringify(event.result, null, 2)}
+                rows={5}
+                className={event.result.isError ? 'error' : ''}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventsPage() {
+  const [events, setEvents] = useState<ToolCallEventInfo[]>([]);
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    const fetchedEvents = await fetchEventsFromTab();
+    setEvents(fetchedEvents);
+  };
+
+  return (
+    <div className="list-container">
+      {events.length === 0 ? (
+        <div className="empty-state">No tool call events captured yet</div>
+      ) : (
+        <div className="list-items">
+          {events.map((event, index) => (
+            <EventRow key={index} event={event} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Panel() {
   const [activeNav, setActiveNav] = useState('tools');
   const [tools, setTools] = useState<ToolDefinitionInfo[]>([]);
@@ -312,6 +398,12 @@ function Panel() {
         >
           Tools
         </div>
+        <div
+          onClick={() => setActiveNav('events')}
+          className={`sidebar-nav-item ${activeNav === 'events' ? 'active' : ''}`}
+        >
+          Events
+        </div>
       </div>
 
       {/* Main Content */}
@@ -328,6 +420,7 @@ function Panel() {
               </div>
             </div>
           ))}
+        {activeNav === 'events' && <EventsPage />}
       </div>
     </div>
   );

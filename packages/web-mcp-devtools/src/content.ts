@@ -1,3 +1,6 @@
+import type {ToolCallEventInfo} from './types.js';
+import type {CallToolResult} from '@ripul/web-mcp';
+
 const bridgeReadyPromise = new Promise<void>((resolve) => {
   if (document.documentElement.hasAttribute('data-webmcp-bridge-injected')) {
     resolve();
@@ -21,6 +24,8 @@ const bridgeReadyPromise = new Promise<void>((resolve) => {
 });
 
 const pendingCalls = new Map<string, (response: unknown) => void>();
+const toolCallEvents: Array<ToolCallEventInfo> = [];
+const pendingToolCalls = new Map<string, ToolCallEventInfo>();
 
 type ToolEvent =
   | {type: 'TOOL_RESULT'; callId: string; result: unknown}
@@ -31,10 +36,18 @@ type ToolEvent =
       toolName: string;
       params: unknown;
     }
-  | {type: 'FETCH_TOOLS_REQUEST'; callId: string};
+  | {type: 'FETCH_TOOLS_REQUEST'; callId: string}
+  | {
+      type: 'TOOLCALL_EVENT';
+      timestamp: number;
+      toolName: string;
+      params: unknown;
+    }
+  | {type: 'TOOLCALL_RESULT'; toolName: string; result: CallToolResult};
 type ToolRequest =
   | {type: 'EXECUTE_TOOL'; toolName: string; params: unknown}
   | {type: 'FETCH_TOOLS'}
+  | {type: 'FETCH_EVENTS'}
   | {type: 'PING'};
 
 window.addEventListener('message', (event: MessageEvent<ToolEvent>) => {
@@ -42,19 +55,41 @@ window.addEventListener('message', (event: MessageEvent<ToolEvent>) => {
     return;
   }
 
-  const {type, callId} = event.data;
-  const sendResponse = pendingCalls.get(callId);
+  const {type} = event.data;
 
-  if (!sendResponse) {
+  if (type === 'TOOLCALL_EVENT') {
+    const toolEvent: ToolCallEventInfo = {
+      timestamp: event.data.timestamp,
+      toolName: event.data.toolName,
+      params: event.data.params,
+      result: undefined
+    };
+    toolCallEvents.push(toolEvent);
+    pendingToolCalls.set(event.data.toolName, toolEvent);
+    return;
+  }
+
+  if (type === 'TOOLCALL_RESULT') {
+    const toolEvent = pendingToolCalls.get(event.data.toolName);
+    if (toolEvent) {
+      toolEvent.result = event.data.result;
+      pendingToolCalls.delete(event.data.toolName);
+    }
     return;
   }
 
   if (type === 'TOOL_RESULT') {
-    sendResponse({result: event.data.result});
-    pendingCalls.delete(callId);
+    const sendResponse = pendingCalls.get(event.data.callId);
+    if (sendResponse) {
+      sendResponse({result: event.data.result});
+      pendingCalls.delete(event.data.callId);
+    }
   } else if (type === 'TOOLS_RESULT') {
-    sendResponse({tools: event.data.tools});
-    pendingCalls.delete(callId);
+    const sendResponse = pendingCalls.get(event.data.callId);
+    if (sendResponse) {
+      sendResponse({tools: event.data.tools});
+      pendingCalls.delete(event.data.callId);
+    }
   }
 });
 
@@ -90,6 +125,11 @@ function handleRequest(
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === 'PING') {
     sendResponse({pong: true});
+    return true;
+  }
+
+  if (request.type === 'FETCH_EVENTS') {
+    sendResponse({events: toolCallEvents});
     return true;
   }
 
