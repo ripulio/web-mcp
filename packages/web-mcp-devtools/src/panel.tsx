@@ -262,12 +262,10 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
   };
 
   return (
-    <div className="tool-row">
-      <div className="tool-header">
-        <div className="tool-info">
-          <div className="tool-name">{tool.name}</div>
-          <div className="tool-description">{tool.description}</div>
-        </div>
+    <>
+      <div className="table-cell">{tool.name}</div>
+      <div className="table-cell">{tool.description}</div>
+      <div className="table-cell table-cell-action">
         {!isExpanded && (
           <button onClick={handleRunClick} className="tool-run-button">
             Run
@@ -276,11 +274,17 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
       </div>
 
       {isExpanded && (
-        <ToolForm
-          tool={tool}
-          onCancel={handleCancel}
-          onExecute={handleExecute}
-        />
+        <>
+          <div className="table-expanded-cell"></div>
+          <div className="table-expanded-cell">
+            <ToolForm
+              tool={tool}
+              onCancel={handleCancel}
+              onExecute={handleExecute}
+            />
+          </div>
+          <div className="table-expanded-cell"></div>
+        </>
       )}
 
       {isExecuting && (
@@ -290,16 +294,22 @@ function ToolRow({tool}: {tool: ToolDefinitionInfo}) {
       )}
 
       {result && (
-        <div className="tool-result">
-          <label>Result:</label>
-          <textarea
-            readOnly
-            value={JSON.stringify(result, null, 2)}
-            rows={10}
-          />
-        </div>
+        <>
+          <div className="table-expanded-cell"></div>
+          <div className="table-expanded-cell">
+            <div className="tool-result">
+              <label>Result:</label>
+              <textarea
+                readOnly
+                value={JSON.stringify(result, null, 2)}
+                rows={10}
+              />
+            </div>
+          </div>
+          <div className="table-expanded-cell"></div>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -311,39 +321,55 @@ function EventRow({event}: {event: ToolCallEventInfo}) {
   };
 
   return (
-    <div className="list-row">
+    <>
       <div
-        className="list-row-header clickable"
+        className="table-cell table-cell-clickable"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="list-row-time">{formatTimestamp(event.timestamp)}</div>
-        <div className="list-row-title">{event.toolName}</div>
-        <div className="list-row-expand">{isExpanded ? '▼' : '▶'}</div>
+        {formatTimestamp(event.timestamp)}
+      </div>
+      <div
+        className="table-cell table-cell-clickable"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {event.toolName}
+      </div>
+      <div
+        className="table-cell table-cell-expand table-cell-clickable"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {isExpanded ? '▼' : '▶'}
       </div>
       {isExpanded && (
-        <div className="list-row-details">
-          <div className="detail-section">
-            <label>Parameters:</label>
-            <textarea
-              readOnly
-              value={JSON.stringify(event.params, null, 2)}
-              rows={5}
-            />
-          </div>
-          {event.result && (
-            <div className="detail-section">
-              <label>Result:</label>
-              <textarea
-                readOnly
-                value={JSON.stringify(event.result, null, 2)}
-                rows={5}
-                className={event.result.isError ? 'error' : ''}
-              />
+        <>
+          <div className="table-expanded-cell"></div>
+          <div className="table-expanded-cell">
+            <div className="event-details">
+              <div className="detail-section">
+                <label>Parameters:</label>
+                <textarea
+                  readOnly
+                  value={JSON.stringify(event.params, null, 2)}
+                  rows={5}
+                />
+              </div>
+              {event.result && (
+                <div className="detail-section">
+                  <label>Result:</label>
+                  <textarea
+                    readOnly
+                    value={JSON.stringify(event.result, null, 2)}
+                    rows={5}
+                    className={event.result.isError ? 'error' : ''}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+          <div className="table-expanded-cell"></div>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -360,11 +386,14 @@ function EventsPage() {
   };
 
   return (
-    <div className="list-container">
+    <div className="table-container">
       {events.length === 0 ? (
         <div className="empty-state">No tool call events captured yet</div>
       ) : (
-        <div className="list-items">
+        <div className="table-grid">
+          <div className="table-header-cell">Time</div>
+          <div className="table-header-cell">Tool Name</div>
+          <div className="table-header-cell"></div>
           {events.map((event, index) => (
             <EventRow key={index} event={event} />
           ))}
@@ -412,8 +441,11 @@ function Panel() {
           (tools.length === 0 ? (
             <div className="empty-state">No tools detected on this page</div>
           ) : (
-            <div className="tools-container">
-              <div className="tools-list">
+            <div className="table-container">
+              <div className="table-grid">
+                <div className="table-header-cell">Name</div>
+                <div className="table-header-cell">Description</div>
+                <div className="table-header-cell"></div>
                 {tools.map((tool) => (
                   <ToolRow key={tool.name} tool={tool} />
                 ))}

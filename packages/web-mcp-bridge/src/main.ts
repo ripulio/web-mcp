@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import type {ToolDefinitionInfo} from '@ripul/web-mcp';
+import type {ToolDefinitionInfo, CallToolResult} from '@ripul/web-mcp';
 import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -84,7 +84,7 @@ async function callWebTool(
   url: string,
   name: string,
   input: Record<string, unknown>
-) {
+): Promise<CallToolResult> {
   const browser = await getBrowser();
   const page = await browser.newPage();
 
@@ -93,7 +93,7 @@ async function callWebTool(
 
     const result = await page.evaluate(
       (toolInput) => {
-        return new Promise((resolve) => {
+        return new Promise<CallToolResult>((resolve) => {
           window.dispatchEvent(
             new window.ToolCallEvent(toolInput.name, toolInput.input, resolve)
           );
@@ -102,14 +102,7 @@ async function callWebTool(
       {input, name}
     );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({result})
-        }
-      ]
-    };
+    return result;
   } finally {
     await page.close();
   }
