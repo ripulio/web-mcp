@@ -1,6 +1,10 @@
 import {describe, it, expect, vi} from 'vitest';
 import '../src/main.js';
-import {type ToolDefinition, ToolCallEvent} from '../src/main.js';
+import {
+  type ToolDefinition,
+  ToolCallEvent,
+  type CallToolResult
+} from '../src/main.js';
 
 describe('provideContext', () => {
   it('should register tools', async () => {
@@ -41,7 +45,13 @@ describe('provideContext', () => {
       window.dispatchEvent(toolCallEvent);
     }).not.toThrow();
     expect(respondWith).toHaveBeenCalledWith({
-      error: 'Tool not found: unknownTool'
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'Tool not found: unknownTool'
+        }
+      ]
     });
   });
 
@@ -73,11 +83,24 @@ describe('provideContext', () => {
     await Promise.resolve();
 
     expect(execute).toHaveBeenCalled();
-    expect(respondWith).toHaveBeenCalledWith({error: 'Execution failed'});
+    expect(respondWith).toHaveBeenCalledWith({
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'Error executing tool failingTool: Execution failed'
+        }
+      ]
+    });
   });
 
   it('should respond with tool results', async () => {
-    const execute = vi.fn().mockResolvedValue('Success');
+    const result: CallToolResult = {
+      content: [{type: 'text', text: 'Success'}]
+    };
+    const execute = vi
+      .fn<() => Promise<CallToolResult>>()
+      .mockResolvedValue(result);
     const toolDefinition: ToolDefinition = {
       name: 'successfulTool',
       description: 'A tool that succeeds',
@@ -100,6 +123,6 @@ describe('provideContext', () => {
     await Promise.resolve();
 
     expect(execute).toHaveBeenCalled();
-    expect(respondWith).toHaveBeenCalledWith({result: 'Success'});
+    expect(respondWith).toHaveBeenCalledWith(result);
   });
 });
