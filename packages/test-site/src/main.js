@@ -1,4 +1,4 @@
-import '../node_modules/@ripul/web-mcp/lib/main.js';
+import '@ripul/web-mcp';
 
 const USERS = [
   { id: 1, name: 'Alice Johnson', email: 'alice.johnson@example.com', role: 'Admin' },

@@ -8,10 +8,10 @@
   "main": "lib/main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "sirv --port=3045 -D"
+    "start": "vite dev"
   },
   "devDependencies": {
-    "@ripul/web-mcp": "file:../packages/web-mcp",
-    "sirv-cli": "^3.0.1"
+    "@ripul/web-mcp": "*",
+    "vite": "^7.1.7"
   }
 }
