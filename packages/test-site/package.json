@@ -1,0 +1,17 @@
+{
+  "name": "test-site",
+  "version": "1.0.0",
+  "description": "A test site",
+  "license": "MIT",
+  "author": "James Garbutt (https://github.com/43081j)",
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "sirv --port=3045 -D"
+  },
+  "devDependencies": {
+    "@ripul/web-mcp": "file:../packages/web-mcp",
+    "sirv-cli": "^3.0.1"
+  }
+}
