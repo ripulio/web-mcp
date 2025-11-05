@@ -29,6 +29,6 @@
     "dset": "^3.1.4",
     "esbuild": "^0.25.11",
     "preact": "^10.27.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }
