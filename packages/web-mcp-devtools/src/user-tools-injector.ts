@@ -6,6 +6,7 @@ import {registry} from '@ripul/web-mcp-tools';
     console.warn(
       '[WebMCP DevTools] window.agent not available, user tools not registered'
     );
+    window.postMessage({type: 'WEBMCP_USER_TOOLS_READY'}, '*');
     return;
   }
 
@@ -44,4 +45,7 @@ import {registry} from '@ripul/web-mcp-tools';
       }
     }
   }
+
+  // Signal that user tools are ready
+  window.postMessage({type: 'WEBMCP_USER_TOOLS_READY'}, '*');
 })();

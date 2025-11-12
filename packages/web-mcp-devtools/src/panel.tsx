@@ -18,8 +18,16 @@ async function ensureContentScript(): Promise<void> {
   }
 }
 
-async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
+async function waitForToolsReady(): Promise<void> {
   await ensureContentScript();
+
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  await chrome.tabs.sendMessage(tabId, {type: 'WAIT_FOR_TOOLS_READY'});
+}
+
+async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
+  await waitForToolsReady();
 
   const tabId = chrome.devtools.inspectedWindow.tabId;
 
@@ -536,6 +544,11 @@ function Panel() {
   const [activeNav, setActiveNav] = useState('tools');
   const [tools, setTools] = useState<ToolDefinitionInfo[]>([]);
 
+  const loadTools = async () => {
+    const fetchedTools = await fetchToolsFromTab();
+    setTools(fetchedTools);
+  };
+
   useEffect(() => {
     loadTools();
   }, []);
@@ -546,10 +559,17 @@ function Panel() {
     }
   }, [activeNav]);
 
-  const loadTools = async () => {
-    const fetchedTools = await fetchToolsFromTab();
-    setTools(fetchedTools);
-  };
+  useEffect(() => {
+    const handleNavigation = () => {
+      loadTools();
+    };
+
+    chrome.devtools.network.onNavigated.addListener(handleNavigation);
+
+    return () => {
+      chrome.devtools.network.onNavigated.removeListener(handleNavigation);
+    };
+  }, []);
 
   return (
     <div className="panel-container">
@@ -602,10 +622,6 @@ function Panel() {
 
 function main(): void {
   renderTools();
-
-  chrome.devtools.network.onNavigated.addListener(() => {
-    setTimeout(renderTools, 500);
-  });
 }
 
 if (chrome.devtools) {
