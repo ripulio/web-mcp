@@ -1,25 +1,32 @@
-import type { ToolDefinition } from '@ripul/web-mcp';
+import type {ToolDefinition} from '@ripul/web-mcp';
 
 const companySearchTool: ToolDefinition = {
   name: 'companySearch',
-  description: 'Search for company information by name or person. This tool will trigger a search but will not return results directly. Use the `listCompanies` tool to retrieve search results after performing a search.',
+  description:
+    'Search for company information by name or person. This tool will trigger a search but will not return results directly. Use the `listCompanies` tool to retrieve search results after performing a search.',
   inputSchema: {
     type: 'object',
     properties: {
-      query: { type: 'string', description: 'The search query (company name or person).' },
+      query: {
+        type: 'string',
+        description: 'The search query (company name or person).'
+      }
     }
   },
   execute: async (input: unknown) => {
-    const { query } = input as { query: string };
-    const searchInput = document.querySelector<HTMLInputElement>('#site-search-text');
+    const {query} = input as {query: string};
+    const searchInput =
+      document.querySelector<HTMLInputElement>('#site-search-text');
 
     if (!searchInput) {
       return {
         isError: true,
-        content: [{
-          type: 'text',
-          text: 'Search input element not found on the page.'
-        }]
+        content: [
+          {
+            type: 'text',
+            text: 'Search input element not found on the page.'
+          }
+        ]
       };
     }
 
@@ -30,10 +37,12 @@ const companySearchTool: ToolDefinition = {
     if (!form) {
       return {
         isError: true,
-        content: [{
-          type: 'text',
-          text: 'Search form element not found on the page.'
-        }]
+        content: [
+          {
+            type: 'text',
+            text: 'Search form element not found on the page.'
+          }
+        ]
       };
     }
 
@@ -41,10 +50,12 @@ const companySearchTool: ToolDefinition = {
 
     return {
       isError: false,
-      content: [{
-        type: 'text',
-        text: `Search submitted for query: "${query}"`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Search submitted for query: "${query}"`
+        }
+      ]
     };
   }
 };
@@ -57,14 +68,18 @@ const listCompaniesTool: ToolDefinition = {
     properties: {}
   },
   execute: async () => {
-    const rows = document.querySelectorAll<HTMLElement>('#results > .type-company');
+    const rows = document.querySelectorAll<HTMLElement>(
+      '#results > .type-company'
+    );
     if (rows.length === 0) {
       return {
         isError: true,
-        content: [{
-          type: 'text',
-          text: 'No company results found on the page.'
-        }]
+        content: [
+          {
+            type: 'text',
+            text: 'No company results found on the page.'
+          }
+        ]
       };
     }
 
@@ -76,17 +91,23 @@ const listCompaniesTool: ToolDefinition = {
     }> = [];
 
     for (const row of rows) {
-      const name = row.querySelector<HTMLElement>(':scope > h3')?.textContent?.trim() || 'N/A';
-      const address = row.querySelector<HTMLElement>(':scope > p:last-of-type')?.textContent?.trim() || 'N/A';
-      const meta = row.querySelector<HTMLElement>(':scope > p.meta')?.textContent || '';
-      const [id, status] = meta.split(' - ').map(s => s.trim());
+      const name =
+        row.querySelector<HTMLElement>(':scope > h3')?.textContent?.trim() ||
+        'N/A';
+      const address =
+        row
+          .querySelector<HTMLElement>(':scope > p:last-of-type')
+          ?.textContent?.trim() || 'N/A';
+      const meta =
+        row.querySelector<HTMLElement>(':scope > p.meta')?.textContent || '';
+      const [id, status] = meta.split(' - ').map((s) => s.trim());
 
-      results.push({ name, id: id || 'N/A', address, status: status || 'N/A' });
+      results.push({name, id: id || 'N/A', address, status: status || 'N/A'});
     }
 
     return {
       isError: false,
-      content: results.map(company => ({
+      content: results.map((company) => ({
         type: 'text',
         text: `Name: ${company.name}\nID: ${company.id}\nAddress: ${company.address}\nStatus: ${company.status}`
       }))
@@ -95,20 +116,27 @@ const listCompaniesTool: ToolDefinition = {
 };
 
 export interface ToolBinding {
-  domains: string[];
-  tools: ToolDefinition[];
+  tool: ToolDefinition;
   pathMatches?: (path: string) => boolean;
 }
 
-export const registry: ToolBinding[] = [
+export interface ToolRegistryEntry {
+  domains: string[];
+  tools: ToolBinding[];
+}
+
+export const registry: ToolRegistryEntry[] = [
   {
     domains: ['find-and-update.company-information.service.gov.uk'],
-    pathMatches: (path) => path.startsWith('/search'),
-    tools: [listCompaniesTool],
-  },
-  {
-    domains: ['find-and-update.company-information.service.gov.uk'],
-    pathMatches: (path) => path === '/',
-    tools: [companySearchTool],
+    tools: [
+      {
+        tool: companySearchTool,
+        pathMatches: (path) => path === '/'
+      },
+      {
+        tool: listCompaniesTool,
+        pathMatches: (path) => path.startsWith('/search')
+      }
+    ]
   }
 ];

@@ -10,6 +10,13 @@ const bridgeReadyPromise = new Promise<void>((resolve) => {
   const handleBridgeReady = (event: MessageEvent) => {
     if (event.source === window && event.data.type === 'WEBMCP_BRIDGE_READY') {
       window.removeEventListener('message', handleBridgeReady);
+
+      // Inject user tools after bridge is ready
+      const userToolsScript = document.createElement('script');
+      userToolsScript.src = chrome.runtime.getURL('user-tools-injector.js');
+      userToolsScript.type = 'module';
+      document.documentElement.appendChild(userToolsScript);
+
       resolve();
     }
   };
