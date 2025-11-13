@@ -7,15 +7,59 @@ export const googleDocsConfig: SiteInjectionConfig = {
   code: `
     const TOOL_NAME = "google_docs_get_content";
 
+    function describeScriptElement(scriptEl) {
+      if (!scriptEl) {
+        return "null";
+      }
+
+      const src = scriptEl.getAttribute("src");
+      if (src) {
+        return '<script src="' + src + '">';
+      }
+
+      const snippet = (scriptEl.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 80);
+      if (!snippet) {
+        return "<script>(empty inline script)</script>";
+      }
+
+      return "<script>" + snippet + (snippet.length === 80 ? "..." : "") + "</script>";
+    }
+
     function findModelChunkScript() {
-      return (
-        document.querySelector("body > script:nth-child(25)") ||
-        Array.from(document.querySelectorAll("script")).find((script) => {
-          const source = script?.textContent || "";
-          return source.includes("DOCS_modelChunk");
-        }) ||
-        null
-      );
+      const selector = "body > script:nth-child(25)";
+      const selectorMatch = document.querySelector(selector);
+      if (selectorMatch) {
+        return {
+          script: selectorMatch,
+          details: "Selector " + selector + " returned " + describeScriptElement(selectorMatch),
+        };
+      }
+
+      const scripts = Array.from(document.querySelectorAll("script"));
+      const fallbackIndex = scripts.findIndex((script) => {
+        const source = script?.textContent || "";
+        return source.includes("DOCS_modelChunk");
+      });
+
+      if (fallbackIndex >= 0) {
+        const match = scripts[fallbackIndex];
+        return {
+          script: match,
+          details:
+            'Fallback document.querySelectorAll("script") found index ' +
+            fallbackIndex +
+            " => " +
+            describeScriptElement(match),
+        };
+      }
+
+      return {
+        script: null,
+        details:
+          "Selector " +
+          selector +
+          " returned null and fallback search did not locate an inline DOCS_modelChunk script.",
+      };
     }
 
     function getGlobalModelChunk() {
@@ -26,9 +70,11 @@ export const googleDocsConfig: SiteInjectionConfig = {
       return null;
     }
 
-    function parseModelChunkFromScript(scriptEl) {
+    function parseModelChunkFromScript(scriptEl, selectionDetails = "") {
+      const detailSuffix = selectionDetails ? " " + selectionDetails : "";
+
       if (!scriptEl) {
-        throw new Error("Selector didn't match any script.");
+        throw new Error("Selector didn't match any script." + detailSuffix);
       }
 
       const source = scriptEl.textContent || "";
@@ -43,11 +89,11 @@ export const googleDocsConfig: SiteInjectionConfig = {
           // Evaluate only the JSON.parse expression to safely decode the payload.
           return new Function("JSON", "return (" + jsonParseMatch[1] + ");")(JSON);
         } catch {
-          throw new Error("Failed to evaluate DOCS_modelChunk JSON.parse expression.");
+          throw new Error("Failed to evaluate DOCS_modelChunk JSON.parse expression." + detailSuffix);
         }
       }
 
-      throw new Error("Couldn't find DOCS_modelChunk assignment.");
+      throw new Error("Couldn't find DOCS_modelChunk assignment." + detailSuffix);
     }
 
     function getDocsModelChunk() {
@@ -56,8 +102,8 @@ export const googleDocsConfig: SiteInjectionConfig = {
         return globalChunk;
       }
 
-      const scriptEl = findModelChunkScript();
-      return parseModelChunkFromScript(scriptEl);
+      const { script: scriptEl, details: scriptDetails } = findModelChunkScript();
+      return parseModelChunkFromScript(scriptEl, scriptDetails);
     }
 
     function ensureGetGoogleDocsContent() {
