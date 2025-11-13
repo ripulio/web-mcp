@@ -54,7 +54,7 @@ describe('AgentToolRegistry', () => {
   it('rejects invalid definitions', () => {
     const registry = new AgentToolRegistry();
 
-    expect(() => registry.define({} as AgentToolDefinition)).toThrow(
+    expect(() => registry.define(null as unknown as AgentToolDefinition)).toThrow(
       /must be an object/
     );
     expect(() =>
