@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Web MCP Injector",
+  "description": "Boilerplate Chrome MV3 extension scaffolded for development experiments.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "135.0.0.0",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Web MCP Injector"
+  },
+  "permissions": [
+    "userScripts",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}
