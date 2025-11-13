@@ -25,7 +25,10 @@ export default defineConfig([
     ]
   },
   {
-    files: ['packages/web-mcp-devtools/{src,test}/**/*.{ts,tsx}'],
+    files: [
+      'packages/web-mcp-devtools/{src,test}/**/*.{ts,tsx}',
+      'packages/web-mcp-injector/{src,test}/**/*.{ts,tsx}'
+    ],
     languageOptions: {
       globals: {
         chrome: 'readonly'

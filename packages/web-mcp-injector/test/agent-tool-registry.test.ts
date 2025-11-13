@@ -1,5 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {AgentToolRegistry} from '../src/shared/agent-tool-registry.js';
+import {
+  AgentToolDefinition,
+  AgentToolRegistry
+} from '../src/shared/agent-tool-registry.js';
 
 describe('AgentToolRegistry', () => {
   it('stores frozen tool definitions', () => {
@@ -51,12 +54,14 @@ describe('AgentToolRegistry', () => {
   it('rejects invalid definitions', () => {
     const registry = new AgentToolRegistry();
 
-    expect(() => registry.define({} as any)).toThrow(/must be an object/);
-    expect(() => registry.define({name: 42} as any)).toThrow(
-      /requires a string name/
+    expect(() => registry.define({} as AgentToolDefinition)).toThrow(
+      /must be an object/
     );
-    expect(() => registry.define({name: 'bad'} as any)).toThrow(
-      /missing an execute/
-    );
+    expect(() =>
+      registry.define({name: 42} as unknown as AgentToolDefinition)
+    ).toThrow(/requires a string name/);
+    expect(() =>
+      registry.define({name: 'bad'} as unknown as AgentToolDefinition)
+    ).toThrow(/missing an execute/);
   });
 });
