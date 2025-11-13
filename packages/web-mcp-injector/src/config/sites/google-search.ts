@@ -1,11 +1,9 @@
-import type { SiteInjectionConfig } from "../types.js";
+import type {SiteInjectionConfig} from '../types.js';
 
 export const googleSearchConfig: SiteInjectionConfig = {
-  id: "google-search-results",
-  description: "Tools for interacting with Google Search result pages.",
-  matchers: [
-    /^https?:\/\/(www\.)?google\.[^/]+\/search/i,
-  ],
+  id: 'google-search-results',
+  description: 'Tools for interacting with Google Search result pages.',
+  matchers: [/^https?:\/\/(www\.)?google\.[^/]+\/search/i],
   code: `
     const TOOL_NAME = "google_search_list_results";
 
@@ -68,5 +66,5 @@ export const googleSearchConfig: SiteInjectionConfig = {
         },
       });
     }
-  `,
+  `
 };

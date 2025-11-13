@@ -4,7 +4,9 @@ export interface AgentToolDefinition<TResult = unknown, TInput = unknown> {
   [key: string]: unknown;
 }
 
-type Waiter<TResult, TInput> = (definition: AgentToolDefinition<TResult, TInput>) => void;
+type Waiter<TResult, TInput> = (
+  definition: AgentToolDefinition<TResult, TInput>
+) => void;
 
 /**
  * AgentToolRegistry maintains a set of tool definitions keyed by name.
@@ -17,7 +19,9 @@ export class AgentToolRegistry<TResult = unknown, TInput = unknown> {
   /**
    * Register a new tool definition.
    */
-  define(definition: AgentToolDefinition<TResult, TInput>): AgentToolDefinition<TResult, TInput> {
+  define(
+    definition: AgentToolDefinition<TResult, TInput>
+  ): AgentToolDefinition<TResult, TInput> {
     const normalized = this.#normalizeDefinition(definition);
 
     if (this.#tools.has(normalized.name)) {
@@ -64,27 +68,32 @@ export class AgentToolRegistry<TResult = unknown, TInput = unknown> {
     });
   }
 
-  #normalizeDefinition(definition: AgentToolDefinition<TResult, TInput>): AgentToolDefinition<TResult, TInput> {
-    if (!definition || typeof definition !== "object") {
-      throw new TypeError("Tool definition must be an object.");
+  #normalizeDefinition(
+    definition: AgentToolDefinition<TResult, TInput>
+  ): AgentToolDefinition<TResult, TInput> {
+    if (!definition || typeof definition !== 'object') {
+      throw new TypeError('Tool definition must be an object.');
     }
 
-    const { name, execute, ...rest } = definition;
+    const {name, execute, ...rest} = definition;
 
-    if (!name || typeof name !== "string") {
-      throw new TypeError("Tool definition requires a string name.");
+    if (!name || typeof name !== 'string') {
+      throw new TypeError('Tool definition requires a string name.');
     }
 
-    if (typeof execute !== "function") {
+    if (typeof execute !== 'function') {
       throw new TypeError(`Tool "${name}" is missing an execute function.`);
     }
 
-    return Object.freeze({ name, execute, ...rest }) as AgentToolDefinition<TResult, TInput>;
+    return Object.freeze({name, execute, ...rest}) as AgentToolDefinition<
+      TResult,
+      TInput
+    >;
   }
 
   #resolveWaiters(
     name: string,
-    definition: AgentToolDefinition<TResult, TInput>,
+    definition: AgentToolDefinition<TResult, TInput>
   ): void {
     const waiters = this.#waiters.get(name);
     if (!waiters) {

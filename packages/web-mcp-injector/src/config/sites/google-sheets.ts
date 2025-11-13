@@ -1,8 +1,9 @@
-import type { SiteInjectionConfig } from "../types.js";
+import type {SiteInjectionConfig} from '../types.js';
 
 export const googleSheetsConfig: SiteInjectionConfig = {
-  id: "google-sheets",
-  description: "Tools for extracting grid content from Google Sheets documents.",
+  id: 'google-sheets',
+  description:
+    'Tools for extracting grid content from Google Sheets documents.',
   matchers: [/^https?:\/\/docs\.google\.com\/spreadsheets\//i],
   code: `
     const TOOL_NAME = "google_sheets_get_content";
@@ -264,5 +265,5 @@ export const googleSheetsConfig: SiteInjectionConfig = {
         },
       });
     }
-  `,
+  `
 };

@@ -1,26 +1,28 @@
 /// <reference types="chrome" />
 
-import { agentInjectionConfigs } from "./config/injection-config.js";
-import type { AgentInjectionConfig } from "./config/types.js";
+import {agentInjectionConfigs} from './config/injection-config.js';
+import type {AgentInjectionConfig} from './config/types.js';
 
-const DEBUG_PREFIX = "[Web MCP Injector]";
+const DEBUG_PREFIX = '[Web MCP Injector]';
 let userScriptsAvailabilityWarningLogged = false;
 
-type UserScriptsExecuteFn = (injection: MinimalUserScriptInjection) => Promise<unknown>;
+type UserScriptsExecuteFn = (
+  injection: MinimalUserScriptInjection
+) => Promise<unknown>;
 
 type UserScriptsApi = typeof chrome.userScripts & {
   execute?: UserScriptsExecuteFn;
 };
 
 interface MinimalUserScriptInjection {
-  js: Array<{ code?: string; file?: string }>;
+  js: Array<{code?: string; file?: string}>;
   target: {
     tabId: number;
     allFrames?: boolean;
     frameIds?: number[];
     documentIds?: string[];
   };
-  world?: "MAIN" | "USER_SCRIPT";
+  world?: 'MAIN' | 'USER_SCRIPT';
   worldId?: string;
   injectImmediately?: boolean;
 }
@@ -34,7 +36,7 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete" || !tab?.url) {
+  if (changeInfo.status !== 'complete' || !tab?.url) {
     return;
   }
 
@@ -49,7 +51,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   const snippets = matchingConfigs
     .map((config) => config.code)
-    .filter((snippet): snippet is string => typeof snippet === "string" && snippet.trim().length > 0);
+    .filter(
+      (snippet): snippet is string =>
+        typeof snippet === 'string' && snippet.trim().length > 0
+    );
 
   if (!snippets.length) {
     return;
@@ -60,7 +65,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!userScriptsAvailable) {
     if (!userScriptsAvailabilityWarningLogged) {
       console.warn(
-        `${DEBUG_PREFIX} chrome.userScripts is unavailable. Ensure the permission is granted and the "Allow User Scripts" toggle (or Developer Mode on Chrome <138) is enabled. See https://developer.chrome.com/docs/extensions/reference/api/userScripts for details.`,
+        `${DEBUG_PREFIX} chrome.userScripts is unavailable. Ensure the permission is granted and the "Allow User Scripts" toggle (or Developer Mode on Chrome <138) is enabled. See https://developer.chrome.com/docs/extensions/reference/api/userScripts for details.`
       );
       userScriptsAvailabilityWarningLogged = true;
     }
@@ -71,35 +76,50 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     return;
   }
 
-  const source = createInjectionSource(snippets, matchingConfigs.map((config) => config.id));
+  const source = createInjectionSource(
+    snippets,
+    matchingConfigs.map((config) => config.id)
+  );
 
   try {
     await userScriptsApi.execute({
-      target: { tabId },
-      world: "MAIN",
-      js: [{ code: source }],
+      target: {tabId},
+      world: 'MAIN',
+      js: [{code: source}]
     });
 
     console.info(
       `${DEBUG_PREFIX} injected agent via chrome.userScripts.execute for tab ${tabId} (config ids: ${matchingConfigs
         .map((config) => config.id)
-        .join(", ")})`,
+        .join(', ')})`
     );
   } catch (error) {
-    console.error(`${DEBUG_PREFIX} chrome.userScripts.execute failed for tab ${tabId}:`, error);
+    console.error(
+      `${DEBUG_PREFIX} chrome.userScripts.execute failed for tab ${tabId}:`,
+      error
+    );
   }
 });
 
-async function isUserScriptsAvailable(api: UserScriptsApi | null = getUserScriptsApi()): Promise<boolean> {
-  if (!api || typeof api.getScripts !== "function" || typeof api.execute !== "function") {
+async function isUserScriptsAvailable(
+  api: UserScriptsApi | null = getUserScriptsApi()
+): Promise<boolean> {
+  if (
+    !api ||
+    typeof api.getScripts !== 'function' ||
+    typeof api.execute !== 'function'
+  ) {
     return false;
   }
 
   try {
-    await api.getScripts({ ids: [] });
+    await api.getScripts({ids: []});
     return true;
   } catch (error) {
-    console.warn(`${DEBUG_PREFIX} chrome.userScripts is defined but not available:`, error);
+    console.warn(
+      `${DEBUG_PREFIX} chrome.userScripts is defined but not available:`,
+      error
+    );
     return false;
   }
 }
@@ -114,16 +134,22 @@ function selectMatchingConfigs(url: string): AgentInjectionConfig[] {
       try {
         return matcher.test(url);
       } catch (error) {
-        console.warn(`${DEBUG_PREFIX} invalid matcher in config ${config.id}:`, error);
+        console.warn(
+          `${DEBUG_PREFIX} invalid matcher in config ${config.id}:`,
+          error
+        );
         return false;
       }
     });
   });
 }
 
-const SNIPPET_PLACEHOLDER = "__WEB_MCP_SNIPPETS__";
+const SNIPPET_PLACEHOLDER = '__WEB_MCP_SNIPPETS__';
 
-function createInjectionSource(snippets: string[], configIds: string[]): string {
+function createInjectionSource(
+  snippets: string[],
+  configIds: string[]
+): string {
   const serializedConfigIds = JSON.stringify(configIds);
   const sourceUrl = createSourceLabel(configIds);
   const snippetBlocks = buildSnippetBlocks(snippets);
@@ -353,15 +379,17 @@ ${SNIPPET_PLACEHOLDER}
 
 function createSourceLabel(configIds: string[]): string {
   if (!Array.isArray(configIds) || !configIds.length) {
-    return "web-mcp-agent-bootstrap.js";
+    return 'web-mcp-agent-bootstrap.js';
   }
 
-  const sanitized = configIds.map((id) => sanitizeFileSegment(id)).filter(Boolean);
-  return `web-mcp-agent-bootstrap-${sanitized.join("-")}.js`;
+  const sanitized = configIds
+    .map((id) => sanitizeFileSegment(id))
+    .filter(Boolean);
+  return `web-mcp-agent-bootstrap-${sanitized.join('-')}.js`;
 }
 
 function sanitizeFileSegment(id: string): string {
-  return id.replace(/[^a-z0-9_-]/gi, "_");
+  return id.replace(/[^a-z0-9_-]/gi, '_');
 }
 
 function getUserScriptsApi(): UserScriptsApi | null {
@@ -375,28 +403,28 @@ function getUserScriptsApi(): UserScriptsApi | null {
 
 function buildSnippetBlocks(snippets: string[]): string {
   if (!snippets.length) {
-    return "";
+    return '';
   }
 
   return snippets
     .map((snippet, index) => {
       const indentedSnippet = indentSnippet(snippet);
       return [
-        "      try {",
-        "        ((agent) => {",
+        '      try {',
+        '        ((agent) => {',
         indentedSnippet,
-        "        })(agent);",
-        "      } catch (error) {",
+        '        })(agent);',
+        '      } catch (error) {',
         `        console.error("[Web MCP Injector] snippet ${index} failed", error);`,
-        "      }",
-      ].join("\n");
+        '      }'
+      ].join('\n');
     })
-    .join("\n\n");
+    .join('\n\n');
 }
 
 function indentSnippet(snippet: string): string {
   return snippet
-    .split("\n")
+    .split('\n')
     .map((line) => `          ${line}`)
-    .join("\n");
+    .join('\n');
 }

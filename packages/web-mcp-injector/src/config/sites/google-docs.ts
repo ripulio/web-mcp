@@ -1,8 +1,8 @@
-import type { SiteInjectionConfig } from "../types.js";
+import type {SiteInjectionConfig} from '../types.js';
 
 export const googleDocsConfig: SiteInjectionConfig = {
-  id: "google-docs",
-  description: "Tools for extracting content from Google Docs documents.",
+  id: 'google-docs',
+  description: 'Tools for extracting content from Google Docs documents.',
   matchers: [/^https?:\/\/docs\.google\.com\/document\/d\//i],
   code: `
     const TOOL_NAME = "google_docs_get_content";
@@ -122,5 +122,5 @@ export const googleDocsConfig: SiteInjectionConfig = {
         },
       });
     }
-  `,
+  `
 };
