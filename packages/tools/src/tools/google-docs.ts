@@ -83,9 +83,7 @@ function parseModelChunkFromScript(
 
   // 1) Direct object literal assignment:
   // DOCS_modelChunk = { ... };
-  const literalMatch = source.match(
-    /DOCS_modelChunk\s*=\s*(\{[\s\S]*?\})\s*;/
-  );
+  const literalMatch = source.match(/DOCS_modelChunk\s*=\s*(\{[\s\S]*?\})\s*;/);
   if (literalMatch) {
     // literalMatch[1] is the `{ ... }`
     return JSON.parse(literalMatch[1]);
@@ -110,7 +108,6 @@ function parseModelChunkFromScript(
 
   throw new Error("Couldn't find DOCS_modelChunk assignment." + detailSuffix);
 }
-
 
 interface ChunkLike {
   chunk: Array<{
@@ -263,8 +260,7 @@ export const getContentTool: ToolDefinition = {
   }
 };
 
-const isDocument = (path: string) =>
-  /document\/d\//i.test(path);
+const isDocument = (path: string) => /document\/d\//i.test(path);
 
 export const googleDocsTools: ToolRegistryEntry = {
   domains: ['docs.google.com'],

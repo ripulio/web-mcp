@@ -19,23 +19,44 @@ function findBootstrapDataScript(): HTMLScriptElement | null {
 function parseBootstrapDataFromScript(
   scriptEl: HTMLScriptElement | null
 ): unknown {
+  const existing = (globalThis as any).bootstrapData;
+  if (existing && typeof existing === 'object') {
+    return existing;
+  }
+
   if (!scriptEl) {
     throw new Error('Could not find the Google Sheets bootstrap script tag.');
   }
 
   const source = scriptEl.textContent || '';
-  const match = source.match(/bootstrapData\\s*=\\s*({[\\s\\S]*?});/);
-  if (!match) {
-    throw new Error(
-      'bootstrapData assignment was not found in the script content.'
-    );
+
+  // 1) Object literal: var|let|const bootstrapData = { ... };
+  const objectMatch = source.match(
+    /(?:var|let|const)?\s*bootstrapData\s*=\s*({[\s\S]*?})\s*;/
+  );
+  if (objectMatch) {
+    try {
+      return JSON.parse(objectMatch[1]);
+    } catch {
+      throw new Error('Failed to parse bootstrapData JSON.');
+    }
   }
 
-  try {
-    return JSON.parse(match[1]);
-  } catch (error) {
-    throw new Error('Failed to parse bootstrapData JSON.');
+  // 2) JSON.parse wrapper: bootstrapData = JSON.parse('...json...');
+  const jsonParseMatch = source.match(
+    /(?:var|let|const)?\s*bootstrapData\s*=\s*JSON\.parse\(\s*(['"])([\s\S]*?)\1\s*\)\s*;/
+  );
+  if (jsonParseMatch) {
+    try {
+      return JSON.parse(jsonParseMatch[2]);
+    } catch {
+      throw new Error('Failed to parse bootstrapData JSON.parse payload.');
+    }
   }
+
+  throw new Error(
+    'bootstrapData assignment was not found in the script content.'
+  );
 }
 
 function decodeCellValue(cell: Record<PropertyKey, unknown> | undefined) {
@@ -138,25 +159,25 @@ function extractRowsFromBootstrapData(bootstrapData: unknown) {
       return;
     }
 
-    const rowBlocks = parsed?.[3];
-    if (!Array.isArray(rowBlocks)) {
+    const meta = Array.isArray(parsed?.[0]) ? parsed[0] : [];
+    const colCount = Number(meta?.[4]) || 0;
+    const flatCells = Array.isArray(parsed?.[3]) ? parsed[3] : [];
+
+    if (!flatCells.length || !colCount) {
       return;
     }
 
-    rowBlocks.forEach((rowBlock) => {
-      if (!Array.isArray(rowBlock)) {
-        return;
-      }
-
-      const cells = rowBlock.map((columnBlock) => {
-        if (!Array.isArray(columnBlock)) {
-          return '';
-        }
-
-        const cellPayload = columnBlock.find(
-          (part): part is Record<PropertyKey, unknown> =>
-            part && typeof part === 'object' && Object.keys(part).length > 0
-        );
+    for (let i = 0; i < flatCells.length; i += colCount) {
+      const rowSlice = flatCells.slice(i, i + colCount);
+      const cells = rowSlice.map((columnBlock) => {
+        const cellPayload = Array.isArray(columnBlock)
+          ? columnBlock.find(
+              (part): part is Record<PropertyKey, unknown> =>
+                part && typeof part === 'object' && Object.keys(part).length > 0
+            )
+          : columnBlock && typeof columnBlock === 'object'
+            ? (columnBlock as Record<PropertyKey, unknown>)
+            : undefined;
 
         const decoded = decodeCellValue(cellPayload);
         return decoded == null ? '' : String(decoded);
@@ -168,7 +189,7 @@ function extractRowsFromBootstrapData(bootstrapData: unknown) {
       }
 
       rows.push(normalized);
-    });
+    }
   });
 
   return rows;
