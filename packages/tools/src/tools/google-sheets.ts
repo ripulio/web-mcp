@@ -136,8 +136,32 @@ function isBootstrapDataLike(
   );
 }
 
-function extractRowsFromBootstrapData(bootstrapData: unknown) {
+type SliceOptions = {
+  startRow?: number;
+  endRow?: number;
+  startCol?: number;
+  endCol?: number;
+  maxRows?: number;
+};
+
+function extractRowsFromBootstrapData(
+  bootstrapData: unknown,
+  slice: SliceOptions
+) {
   const rows: Array<string[]> = [];
+  let totalRows = 0;
+  const {
+    startRow = 1,
+    endRow,
+    startCol = 1,
+    endCol,
+    maxRows = MAX_ROWS
+  } = slice;
+
+  const startRowIdx = Math.max(0, startRow - 1);
+  const endRowIdx = endRow != null ? Math.max(endRow - 1, startRowIdx) : null;
+  const startColIdx = Math.max(0, startCol - 1);
+  const endColIdx = endCol != null ? Math.max(endCol - 1, startColIdx) : null;
 
   if (!isBootstrapDataLike(bootstrapData)) {
     throw new Error('Invalid bootstrapData structure.');
@@ -160,6 +184,8 @@ function extractRowsFromBootstrapData(bootstrapData: unknown) {
     }
 
     const meta = Array.isArray(parsed?.[0]) ? parsed[0] : [];
+    const rowStart = Number(meta?.[1]) || 0;
+    const colStart = Number(meta?.[3]) || 0;
     const colCount = Number(meta?.[4]) || 0;
     const flatCells = Array.isArray(parsed?.[3]) ? parsed[3] : [];
 
@@ -169,7 +195,24 @@ function extractRowsFromBootstrapData(bootstrapData: unknown) {
 
     for (let i = 0; i < flatCells.length; i += colCount) {
       const rowSlice = flatCells.slice(i, i + colCount);
-      const cells = rowSlice.map((columnBlock) => {
+      const absoluteRow = rowStart + i / colCount;
+
+      if (absoluteRow < startRowIdx) {
+        continue;
+      }
+      if (endRowIdx != null && absoluteRow > endRowIdx) {
+        break;
+      }
+
+      const cells = rowSlice.flatMap((columnBlock, localColIndex) => {
+        const absoluteCol = colStart + localColIndex;
+        if (absoluteCol < startColIdx) {
+          return [];
+        }
+        if (endColIdx != null && absoluteCol > endColIdx) {
+          return [];
+        }
+
         const cellPayload = Array.isArray(columnBlock)
           ? columnBlock.find(
               (part): part is Record<PropertyKey, unknown> =>
@@ -180,19 +223,26 @@ function extractRowsFromBootstrapData(bootstrapData: unknown) {
             : undefined;
 
         const decoded = decodeCellValue(cellPayload);
-        return decoded == null ? '' : String(decoded);
+        return [decoded == null ? '' : String(decoded)];
       });
 
       const normalized = normalizeRow(cells);
       if (!normalized.length) {
-        return;
+        continue;
       }
 
-      rows.push(normalized);
+      totalRows += 1;
+      if (rows.length < maxRows) {
+        rows.push(normalized);
+      }
     }
   });
 
-  return rows;
+  return {
+    rows,
+    totalRows,
+    truncated: totalRows > maxRows
+  };
 }
 
 function formatAsMarkdownTable(rows: Array<string[]>): string {
@@ -242,30 +292,53 @@ function formatAsMarkdownTable(rows: Array<string[]>): string {
   return tableLines.join('\\n');
 }
 
-function getGoogleSheetsContent() {
+function getGoogleSheetsContent(slice: SliceOptions = {}) {
   const scriptEl = findBootstrapDataScript();
   const bootstrapData = parseBootstrapDataFromScript(scriptEl);
-  const rows = extractRowsFromBootstrapData(bootstrapData);
-  const limitedRows = rows.slice(0, MAX_ROWS);
+  const {rows, totalRows, truncated} = extractRowsFromBootstrapData(
+    bootstrapData,
+    slice
+  );
 
   return {
-    rows: limitedRows,
-    totalRows: rows.length,
-    truncated: rows.length > MAX_ROWS,
-    markdown: formatAsMarkdownTable(limitedRows)
+    rows,
+    totalRows,
+    truncated,
+    markdown: formatAsMarkdownTable(rows)
   };
 }
 
 export const getContentTool: ToolDefinition = {
   name: 'google_sheets_get_content',
-  description: 'Return the current Google Sheets grid content (first 50 rows).',
+  description:
+    'Return the current Google Sheets grid content (supports optional row/column slice, defaults to first 50 rows).',
   inputSchema: {
     type: 'object',
-    properties: {}
+    properties: {
+      startRow: {type: 'number', minimum: 1},
+      endRow: {type: 'number', minimum: 1},
+      startCol: {type: 'number', minimum: 1},
+      endCol: {type: 'number', minimum: 1},
+      maxRows: {type: 'number', minimum: 1}
+    }
   },
-  async execute() {
+  async execute(rawInput: unknown) {
+    const input =
+      (rawInput as {
+        startRow?: number;
+        endRow?: number;
+        startCol?: number;
+        endCol?: number;
+        maxRows?: number;
+      }) || {};
     try {
-      const result = getGoogleSheetsContent();
+      const result = getGoogleSheetsContent({
+        startRow: input?.startRow,
+        endRow: input?.endRow,
+        startCol: input?.startCol,
+        endCol: input?.endCol,
+        maxRows: input?.maxRows
+      });
       const lines = [];
 
       if (result.rows.length) {
@@ -283,7 +356,10 @@ export const getContentTool: ToolDefinition = {
       }
 
       if (result.truncated) {
-        lines.push('', 'Note: output truncated to ' + MAX_ROWS + ' rows.');
+        lines.push(
+          '',
+          'Note: output truncated to ' + (input?.maxRows ?? MAX_ROWS) + ' rows.'
+        );
       }
 
       return {
