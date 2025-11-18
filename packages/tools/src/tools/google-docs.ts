@@ -7,29 +7,6 @@ declare global {
   }
 }
 
-function describeScriptElement(scriptEl: HTMLScriptElement | null): string {
-  if (!scriptEl) {
-    return 'null';
-  }
-
-  const src = scriptEl.getAttribute('src');
-  if (src) {
-    return '<script src="' + src + '">';
-  }
-
-  const snippet = (scriptEl.textContent || '')
-    .replace(/\\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
-  if (!snippet) {
-    return '<script>(empty inline script)</script>';
-  }
-
-  return (
-    '<script>' + snippet + (snippet.length === 80 ? '...' : '') + '</script>'
-  );
-}
-
 function findModelChunkScript(): {
   script: HTMLScriptElement | null;
   details: string;
@@ -167,7 +144,7 @@ function decodeDocOpsString(
   doc: ChunkLike,
   chunk?: Partial<ChunkLike['chunk'][number]>
 ): string {
-  const table = pickStringTable(doc, chunk);
+  const table = pickStringTable(doc, chunk) ?? undefined;
   const uncompress = getUncompressFn();
 
   if (uncompress) {
