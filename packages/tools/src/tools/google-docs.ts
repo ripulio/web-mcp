@@ -34,42 +34,30 @@ function findModelChunkScript(): {
   script: HTMLScriptElement | null;
   details: string;
 } {
-  const selector = 'body > script:nth-child(25)';
-  const selectorMatch = document.querySelector<HTMLScriptElement>(selector);
-  if (selectorMatch) {
-    return {
-      script: selectorMatch,
-      details:
-        'Selector ' +
-        selector +
-        ' returned ' +
-        describeScriptElement(selectorMatch)
-    };
-  }
+  const scripts = [
+    ...document.querySelectorAll<HTMLScriptElement>('script:not([src])')
+  ];
 
-  const scripts = [...document.querySelectorAll<HTMLScriptElement>('script')];
-  const fallback = scripts.find((script) => {
-    const source = script?.textContent || '';
-    return source.includes('DOCS_modelChunk');
+  // Only match the *assignment* to DOCS_modelChunk, not any usage.
+  const candidates = scripts.filter((script) => {
+    const source = script.textContent || '';
+    return /DOCS_modelChunk\s*=\s*{/.test(source);
   });
 
-  if (fallback) {
+  if (candidates.length > 0) {
+    const script = candidates[candidates.length - 1]; // latest chunk if multiple
     return {
-      script: fallback,
+      script,
       details:
-        'Fallback document.querySelectorAll("script") found index ' +
-        scripts.indexOf(fallback) +
-        ' => ' +
-        describeScriptElement(fallback)
+        'Matched DOCS_modelChunk assignment in inline script at index ' +
+        scripts.indexOf(script)
     };
   }
 
   return {
     script: null,
     details:
-      'Selector ' +
-      selector +
-      ' returned null and fallback search did not locate an inline DOCS_modelChunk script.'
+      'No inline script found containing a DOCS_modelChunk object assignment.'
   };
 }
 
@@ -92,19 +80,25 @@ function parseModelChunkFromScript(
   }
 
   const source = scriptEl.textContent || '';
+
+  // 1) Direct object literal assignment:
+  // DOCS_modelChunk = { ... };
   const literalMatch = source.match(
-    /DOCS_modelChunk\\s*=\\s*(\\{[\\s\\S]*?\\});/
+    /DOCS_modelChunk\s*=\s*(\{[\s\S]*?\})\s*;/
   );
   if (literalMatch) {
+    // literalMatch[1] is the `{ ... }`
     return JSON.parse(literalMatch[1]);
   }
 
+  // 2) JSON.parse wrapper:
+  // DOCS_modelChunk = JSON.parse('...json...');
   const jsonParseMatch = source.match(
-    /DOCS_modelChunk\\s*=\\s*(JSON\\.parse\\(\\s*['"][\\s\\S]*?['"]\\s*\\))/
+    /DOCS_modelChunk\s*=\s*(JSON\.parse\(\s*['"][\s\S]*?['"]\s*\))/
   );
   if (jsonParseMatch) {
     try {
-      // Evaluate only the JSON.parse expression to safely decode the payload.
+      // Evaluate only the JSON.parse(...) expression with a fake JSON object
       return new Function('JSON', 'return (' + jsonParseMatch[1] + ');')(JSON);
     } catch {
       throw new Error(
@@ -117,12 +111,81 @@ function parseModelChunkFromScript(
   throw new Error("Couldn't find DOCS_modelChunk assignment." + detailSuffix);
 }
 
+
 interface ChunkLike {
   chunk: Array<{
     ty: string;
     s?: string;
+    ae?: string[];
+    csst?: string[];
+    csdr?: string[];
   }>;
+  ae?: string[];
+  csst?: string[];
+  csdr?: string[];
   [key: string]: unknown;
+}
+
+function pickStringTable(
+  doc: ChunkLike,
+  chunk?: Partial<ChunkLike['chunk'][number]>
+): string[] | null {
+  return (
+    chunk?.ae ||
+    chunk?.csst ||
+    chunk?.csdr ||
+    doc.ae ||
+    doc.csst ||
+    doc.csdr ||
+    null
+  );
+}
+
+function getUncompressFn(): ((raw: string, table?: string[]) => string) | null {
+  const maybe = [
+    (globalThis as any)?.docs?.string?.uncompress,
+    (globalThis as any)?.docs?.string?.O,
+    (globalThis as any)?.csUncompress,
+    (globalThis as any)?.uncompressDocString
+  ].find((fn) => typeof fn === 'function');
+
+  return maybe || null;
+}
+
+function localDecodeWithTable(raw: string, table: string[]): string {
+  let out = '';
+  for (const ch of raw) {
+    const code = ch.codePointAt(0);
+    if (code != null && code < 32 && table[code] != null) {
+      out += table[code];
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function decodeDocOpsString(
+  raw: string,
+  doc: ChunkLike,
+  chunk?: Partial<ChunkLike['chunk'][number]>
+): string {
+  const table = pickStringTable(doc, chunk);
+  const uncompress = getUncompressFn();
+
+  if (uncompress) {
+    try {
+      return uncompress(raw, table);
+    } catch {
+      // fall through to local decode
+    }
+  }
+
+  if (table) {
+    return localDecodeWithTable(raw, table);
+  }
+
+  return raw;
 }
 
 function getDocsModelChunk(): ChunkLike {
@@ -148,11 +211,11 @@ function getGoogleDocsContent() {
   const obj = getDocsModelChunk();
   const text = (obj.chunk || [])
     .filter((chunk) => chunk?.ty === 'is' && typeof chunk.s === 'string')
-    .map((chunk) => chunk.s)
+    .map((chunk) => decodeDocOpsString(chunk.s || '', obj, chunk))
     .join('');
 
   const cleaned = text
-    .replace(/[\\u0000-\\u001F]+/g, ' ')
+    // Preserve decoded text, only normalize obvious whitespace noise.
     .replace(/[ \\t]+\\n/g, '\\n')
     .replace(/\\n{3,}/g, '\\n\\n')
     .trim();
@@ -201,7 +264,7 @@ export const getContentTool: ToolDefinition = {
 };
 
 const isDocument = (path: string) =>
-  /^https?:\/\/docs\.google\.com\/document\/d\//i.test(path);
+  /document\/d\//i.test(path);
 
 export const googleDocsTools: ToolRegistryEntry = {
   domains: ['docs.google.com'],
