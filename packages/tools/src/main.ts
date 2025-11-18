@@ -7,8 +7,8 @@ import {googleSheetsTools} from './tools/google-sheets.js';
 export type {ToolRegistryEntry};
 
 export const registry: ToolRegistryEntry[] = [
-	companiesHouseTools,
-	googleDocsTools,
-	googleSearchTools,
-	googleSheetsTools,
+  companiesHouseTools,
+  googleDocsTools,
+  googleSearchTools,
+  googleSheetsTools
 ];
