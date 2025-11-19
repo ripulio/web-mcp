@@ -19,7 +19,7 @@ function findBootstrapDataScript(): HTMLScriptElement | null {
 function parseBootstrapDataFromScript(
   scriptEl: HTMLScriptElement | null
 ): unknown {
-  const existing = (globalThis as any).bootstrapData;
+  const existing = (globalThis as {bootstrapData?: unknown}).bootstrapData;
   if (existing && typeof existing === 'object') {
     return existing;
   }

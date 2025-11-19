@@ -115,12 +115,25 @@ function pickStringTable(
   );
 }
 
+type MaybeUncompressFn = (raw: string, table?: string[]) => string;
+interface WithUncompress {
+  docs?: {
+    string?: {
+      uncompress?: MaybeUncompressFn;
+      O?: MaybeUncompressFn;
+    };
+  };
+  csUncompress?: MaybeUncompressFn;
+  uncompressDocString?: MaybeUncompressFn;
+}
+
 function getUncompressFn(): ((raw: string, table?: string[]) => string) | null {
+  const globalWithUncompress = globalThis as WithUncompress;
   const maybe = [
-    (globalThis as any)?.docs?.string?.uncompress,
-    (globalThis as any)?.docs?.string?.O,
-    (globalThis as any)?.csUncompress,
-    (globalThis as any)?.uncompressDocString
+    globalWithUncompress?.docs?.string?.uncompress,
+    globalWithUncompress?.docs?.string?.O,
+    globalWithUncompress?.csUncompress,
+    globalWithUncompress?.uncompressDocString
   ].find((fn) => typeof fn === 'function');
 
   return maybe || null;
