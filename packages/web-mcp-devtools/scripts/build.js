@@ -61,6 +61,14 @@ async function build() {
     });
     console.log('✓ Built bridge.js');
 
+    // Build user-tools-injector.ts (injected into page to register user tools)
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(srcDir, 'user-tools-injector.ts')],
+      outfile: join(extensionDir, 'user-tools-injector.js')
+    });
+    console.log('✓ Built user-tools-injector.js');
+
     // Build styles
     await esbuild.build({
       ...commonConfig,

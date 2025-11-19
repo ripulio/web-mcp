@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run --workspaces build",
+    "build": "npm run --workspaces --if-present build",
     "test": "vitest run",
     "lint": "npm run lint:format && npm run lint:js",
     "format": "prettier --write \"packages/*/{test,src}/**/*.ts\"",

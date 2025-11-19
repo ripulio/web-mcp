@@ -3,6 +3,7 @@ import {useState, useEffect} from 'preact/hooks';
 import {type ToolDefinitionInfo} from '@ripul/web-mcp';
 import {dset} from 'dset';
 import type {ToolCallEventInfo} from './types.js';
+import {registry, type ToolRegistryEntry} from '@ripul/web-mcp-tools';
 
 async function ensureContentScript(): Promise<void> {
   const tabId = chrome.devtools.inspectedWindow.tabId;
@@ -17,8 +18,16 @@ async function ensureContentScript(): Promise<void> {
   }
 }
 
-async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
+async function waitForToolsReady(): Promise<void> {
   await ensureContentScript();
+
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+
+  await chrome.tabs.sendMessage(tabId, {type: 'WAIT_FOR_TOOLS_READY'});
+}
+
+async function fetchToolsFromTab(): Promise<ToolDefinitionInfo[]> {
+  await waitForToolsReady();
 
   const tabId = chrome.devtools.inspectedWindow.tabId;
 
@@ -373,6 +382,134 @@ function EventRow({event}: {event: ToolCallEventInfo}) {
   );
 }
 
+interface UserToolState {
+  [key: string]: boolean;
+}
+
+function UserToolRow({
+  entry,
+  index,
+  enabled,
+  onToggle
+}: {
+  entry: ToolRegistryEntry;
+  index: number;
+  enabled: boolean;
+  onToggle: (index: number, enabled: boolean) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <>
+      <div
+        className="table-cell table-cell-clickable"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {entry.domains.join(', ')}
+      </div>
+      <div
+        className="table-cell table-cell-clickable"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {entry.tools.map((tb) => tb.tool.name).join(', ')}
+      </div>
+      <div className="table-cell table-cell-action">
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(index, (e.target as HTMLInputElement).checked)}
+          />
+          <span className="toggle-slider"></span>
+        </label>
+      </div>
+      {isExpanded && (
+        <>
+          <div className="table-expanded-cell"></div>
+          <div className="table-expanded-cell">
+            <div className="user-tool-details">
+              <div className="detail-section">
+                <label>Domains:</label>
+                <div className="detail-value">
+                  {entry.domains.map((domain, i) => (
+                    <div key={i}>{domain}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="detail-section">
+                <label>Tools:</label>
+                <div className="detail-value">
+                  {entry.tools.map((toolBinding, i) => (
+                    <div key={i} style={{marginBottom: '8px'}}>
+                      <strong>{toolBinding.tool.name}</strong> — {toolBinding.tool.description}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="table-expanded-cell"></div>
+        </>
+      )}
+    </>
+  );
+}
+
+function UserToolsPage() {
+  const [toolStates, setToolStates] = useState<UserToolState>({});
+
+  useEffect(() => {
+    loadToolStates();
+  }, []);
+
+  const loadToolStates = async () => {
+    const result = await chrome.storage.local.get('userToolStates');
+    if (result.userToolStates) {
+      setToolStates(result.userToolStates);
+    } else {
+      const initialStates: UserToolState = {};
+      for (let i = 0; i < registry.length; i++) {
+        initialStates[`tool_${i}`] = true;
+      }
+      setToolStates(initialStates);
+      await chrome.storage.local.set({userToolStates: initialStates});
+    }
+  };
+
+  const handleToggle = async (index: number, enabled: boolean) => {
+    // TODO (jg): key by an ID rather than index
+    const newStates = {
+      ...toolStates,
+      [`tool_${index}`]: enabled
+    };
+    setToolStates(newStates);
+    await chrome.storage.local.set({userToolStates: newStates});
+  };
+
+  return (
+    <div className="table-container">
+      {registry.length === 0 ? (
+        <div className="empty-state">No user tools configured</div>
+      ) : (
+        <div className="table-grid">
+          <div className="table-header-cell">Domains</div>
+          <div className="table-header-cell">Tools</div>
+          <div className="table-header-cell">Enabled</div>
+          {registry.map((entry, index) => (
+            <UserToolRow
+              key={index}
+              entry={entry}
+              index={index}
+              enabled={toolStates[`tool_${index}`] !== false}
+              onToggle={handleToggle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EventsPage() {
   const [events, setEvents] = useState<ToolCallEventInfo[]>([]);
 
@@ -407,14 +544,32 @@ function Panel() {
   const [activeNav, setActiveNav] = useState('tools');
   const [tools, setTools] = useState<ToolDefinitionInfo[]>([]);
 
-  useEffect(() => {
-    loadTools();
-  }, []);
-
   const loadTools = async () => {
     const fetchedTools = await fetchToolsFromTab();
     setTools(fetchedTools);
   };
+
+  useEffect(() => {
+    loadTools();
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === 'tools') {
+      loadTools();
+    }
+  }, [activeNav]);
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      loadTools();
+    };
+
+    chrome.devtools.network.onNavigated.addListener(handleNavigation);
+
+    return () => {
+      chrome.devtools.network.onNavigated.removeListener(handleNavigation);
+    };
+  }, []);
 
   return (
     <div className="panel-container">
@@ -425,13 +580,19 @@ function Panel() {
           onClick={() => setActiveNav('tools')}
           className={`sidebar-nav-item ${activeNav === 'tools' ? 'active' : ''}`}
         >
-          Tools
+          Page Tools
         </div>
         <div
           onClick={() => setActiveNav('events')}
           className={`sidebar-nav-item ${activeNav === 'events' ? 'active' : ''}`}
         >
           Events
+        </div>
+        <div
+          onClick={() => setActiveNav('userTools')}
+          className={`sidebar-nav-item ${activeNav === 'userTools' ? 'active' : ''}`}
+        >
+          User Tools
         </div>
       </div>
 
@@ -453,6 +614,7 @@ function Panel() {
             </div>
           ))}
         {activeNav === 'events' && <EventsPage />}
+        {activeNav === 'userTools' && <UserToolsPage />}
       </div>
     </div>
   );
@@ -460,10 +622,6 @@ function Panel() {
 
 function main(): void {
   renderTools();
-
-  chrome.devtools.network.onNavigated.addListener(() => {
-    setTimeout(renderTools, 500);
-  });
 }
 
 if (chrome.devtools) {
