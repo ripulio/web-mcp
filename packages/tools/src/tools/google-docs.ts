@@ -253,6 +253,8 @@ export const getContentTool: ToolDefinition = {
 const isDocument = (path: string) => /document\/d\//i.test(path);
 
 export const googleDocsTools: ToolRegistryEntry = {
+  id: 'google-docs',
+  name: 'Google Docs',
   domains: ['docs.google.com'],
   tools: [
     {

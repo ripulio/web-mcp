@@ -465,7 +465,7 @@ function UserToolsPage() {
   const loadToolStates = async () => {
     const result = await chrome.storage.local.get('userToolStates');
     if (result.userToolStates) {
-      setToolStates(result.userToolStates);
+      setToolStates(result.userToolStates as UserToolState);
     } else {
       const initialStates: UserToolState = {};
       for (let i = 0; i < registry.length; i++) {
