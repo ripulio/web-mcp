@@ -31,5 +31,11 @@ export default defineConfig([
         chrome: 'readonly'
       }
     }
+  },
+  {
+    files: ['packages/*/test/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off'
+    }
   }
 ]);

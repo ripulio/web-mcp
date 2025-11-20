@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-window.agent.tools.define({
+navigator.modelContext.registerTool({
   name: 'list_users',
   description: 'List the users of this website',
   inputSchema: {

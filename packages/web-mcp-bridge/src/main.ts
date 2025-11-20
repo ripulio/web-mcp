@@ -59,7 +59,9 @@ async function registerWebPage(url: string) {
     await page.goto(url, {waitUntil: 'networkidle0'});
 
     const tools = await page.evaluate(() => {
-      const tools = [...window.agent.tools.list()];
+      const tools = navigator.modelContext
+        ? [...navigator.modelContext.list()]
+        : [];
       return tools;
     });
 
@@ -93,14 +95,25 @@ async function callWebTool(
 
     const result = await page.evaluate(
       (toolInput) => {
-        return new Promise<CallToolResult>((resolve) => {
-          window.dispatchEvent(
-            new window.ToolCallEvent(toolInput.name, toolInput.input, resolve)
-          );
-        });
+        return navigator.modelContext?.executeTool(
+          toolInput.name,
+          toolInput.input
+        );
       },
       {input, name}
     );
+
+    if (!result) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Tool ${name} not found on page ${url}`
+          }
+        ]
+      };
+    }
 
     return result;
   } finally {
