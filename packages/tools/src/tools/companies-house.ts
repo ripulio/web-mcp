@@ -117,6 +117,8 @@ export const listCompaniesTool: ToolDefinition = {
 };
 
 export const companiesHouseTools: ToolRegistryEntry = {
+  id: 'companies-house',
+  name: 'Companies House',
   domains: ['find-and-update.company-information.service.gov.uk'],
   tools: [
     {

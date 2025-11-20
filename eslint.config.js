@@ -25,7 +25,7 @@ export default defineConfig([
     ]
   },
   {
-    files: ['packages/web-mcp-devtools/{src,test}/**/*.{ts,tsx}'],
+    files: ['packages/{web-mcp-devtools,web-mcp-extension}/{src,test}/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         chrome: 'readonly'

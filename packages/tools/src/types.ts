@@ -6,6 +6,8 @@ export interface ToolBinding {
 }
 
 export interface ToolRegistryEntry {
+  id: string;
+  name: string;
   domains: string[];
   tools: ToolBinding[];
 }

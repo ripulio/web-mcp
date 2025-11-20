@@ -394,6 +394,8 @@ export const getContentTool: ToolDefinition = {
 };
 
 export const googleSheetsTools: ToolRegistryEntry = {
+  id: 'google-sheets',
+  name: 'Google Sheets',
   domains: ['docs.google.com'],
   tools: [
     {

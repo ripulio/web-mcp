@@ -70,6 +70,8 @@ export const listResultsTool: ToolDefinition = {
 };
 
 export const googleSearchTools: ToolRegistryEntry = {
+  id: 'google-search',
+  name: 'Google Search',
   // TODO (jg): allow regex in domains so we can match `google.*`
   domains: ['google.com', 'www.google.con'],
   tools: [

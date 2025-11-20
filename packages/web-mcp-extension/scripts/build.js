@@ -18,17 +18,17 @@ const commonConfig = {
 
 async function build() {
   try {
-    console.log('Building WebMCP DevTools extension...');
+    console.log('Building WebMCP extension...');
 
-    // Build devtools.ts
+    // Build user-tools-injector.ts (injected into page to register user tools)
     await esbuild.build({
       ...commonConfig,
-      entryPoints: [join(srcDir, 'devtools.ts')],
-      outfile: join(extensionDir, 'devtools.js')
+      entryPoints: [join(srcDir, 'user-tools-injector.ts')],
+      outfile: join(extensionDir, 'user-tools-injector.js')
     });
-    console.log('✓ Built devtools.js');
+    console.log('✓ Built user-tools-injector.js');
 
-    // Build panel.ts
+    // Build panel (settings page)
     await esbuild.build({
       ...commonConfig,
       entryPoints: [join(srcDir, 'panel.tsx')],
@@ -36,7 +36,7 @@ async function build() {
     });
     console.log('✓ Built panel.js');
 
-    // Build background.ts
+    // Build background service worker
     await esbuild.build({
       ...commonConfig,
       entryPoints: [join(srcDir, 'background.ts')],
@@ -44,22 +44,13 @@ async function build() {
     });
     console.log('✓ Built background.js');
 
-    // Build content.ts
+    // Build content script (injects user tools into pages)
     await esbuild.build({
       ...commonConfig,
-      format: 'iife',
       entryPoints: [join(srcDir, 'content.ts')],
       outfile: join(extensionDir, 'content.js')
     });
     console.log('✓ Built content.js');
-
-    // Build bridge.ts
-    await esbuild.build({
-      ...commonConfig,
-      entryPoints: [join(srcDir, 'bridge.ts')],
-      outfile: join(extensionDir, 'bridge.js')
-    });
-    console.log('✓ Built bridge.js');
 
     // Build styles
     await esbuild.build({
