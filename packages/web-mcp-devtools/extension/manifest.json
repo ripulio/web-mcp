@@ -12,7 +12,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["bridge.js", "user-tools-injector.js"],
+      "resources": ["bridge.js"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -1,11 +1,6 @@
 import type {ToolCallEventInfo} from './types.js';
 import type {CallToolResult} from '@ripul/web-mcp';
 
-let userToolsReadyResolve: (() => void) | null = null;
-const userToolsReadyPromise = new Promise<void>((resolve) => {
-  userToolsReadyResolve = resolve;
-});
-
 const bridgeReadyPromise = new Promise<void>((resolve) => {
   if (document.documentElement.hasAttribute('data-webmcp-bridge-injected')) {
     resolve();
@@ -15,12 +10,6 @@ const bridgeReadyPromise = new Promise<void>((resolve) => {
   const handleBridgeReady = (event: MessageEvent) => {
     if (event.source === window && event.data.type === 'WEBMCP_BRIDGE_READY') {
       window.removeEventListener('message', handleBridgeReady);
-
-      // Inject user tools after bridge is ready
-      const userToolsScript = document.createElement('script');
-      userToolsScript.src = chrome.runtime.getURL('user-tools-injector.js');
-      userToolsScript.type = 'module';
-      document.documentElement.appendChild(userToolsScript);
 
       resolve();
     }
@@ -33,17 +22,6 @@ const bridgeReadyPromise = new Promise<void>((resolve) => {
   bridgeScript.type = 'module';
   document.documentElement.appendChild(bridgeScript);
   document.documentElement.setAttribute('data-webmcp-bridge-injected', 'true');
-});
-
-window.addEventListener('message', (event: MessageEvent) => {
-  if (
-    event.source === window &&
-    event.data.type === 'WEBMCP_USER_TOOLS_READY'
-  ) {
-    if (userToolsReadyResolve) {
-      userToolsReadyResolve();
-    }
-  }
 });
 
 const pendingCalls = new Map<string, (response: unknown) => void>();
@@ -158,7 +136,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
 
   if (request.type === 'WAIT_FOR_TOOLS_READY') {
-    Promise.all([bridgeReadyPromise, userToolsReadyPromise]).then(() => {
+    Promise.all([bridgeReadyPromise]).then(() => {
       sendResponse({ready: true});
     });
     return true;
