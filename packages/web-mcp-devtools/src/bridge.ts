@@ -1,6 +1,6 @@
 import type {ToolDefinitionInfo} from '@ripul/web-mcp';
 
-window.addEventListener('message', (event: MessageEvent) => {
+window.addEventListener('message', async (event: MessageEvent) => {
   if (event.source !== window) return;
 
   if (event.data.type === 'EXECUTE_TOOL_REQUEST') {
@@ -17,10 +17,9 @@ window.addEventListener('message', (event: MessageEvent) => {
       );
     };
 
-    if (window.ToolCallEvent) {
-      window.dispatchEvent(
-        new window.ToolCallEvent(toolName, params, callback)
-      );
+    if (navigator.modelContext) {
+      const result = await navigator.modelContext.executeTool(toolName, params);
+      callback(result);
     } else {
       callback({
         isError: true,
@@ -34,8 +33,8 @@ window.addEventListener('message', (event: MessageEvent) => {
     let tools: ToolDefinitionInfo[] = [];
 
     try {
-      if (window.agent) {
-        tools = [...window.agent.tools.list()];
+      if (navigator.modelContext) {
+        tools = [...navigator.modelContext.list()];
       }
     } catch (e) {
       // do nothing
@@ -52,35 +51,37 @@ window.addEventListener('message', (event: MessageEvent) => {
   }
 });
 
-// Listen for toolcall events in the page context and relay them to content script
-window.addEventListener(
-  'toolcall',
-  (event) => {
+if (navigator.modelContext) {
+  const original = navigator.modelContext.executeTool;
+
+  navigator.modelContext.executeTool = async (toolName, params) => {
     window.postMessage(
       {
         type: 'TOOLCALL_EVENT',
         timestamp: Date.now(),
-        toolName: event.name,
-        params: event.args
+        toolName,
+        params
       },
       '*'
     );
 
-    // Wrap respondWith to capture the result
-    const originalRespondWith = event.respondWith.bind(event);
-    event.respondWith = (result) => {
-      window.postMessage(
-        {
-          type: 'TOOLCALL_RESULT',
-          toolName: event.name,
-          result: result
-        },
-        '*'
-      );
-      originalRespondWith(result);
-    };
-  },
-  true
-); // Use capture phase to intercept before other handlers
+    const result = await original.call(
+      navigator.modelContext,
+      toolName,
+      params
+    );
+
+    window.postMessage(
+      {
+        type: 'TOOLCALL_RESULT',
+        toolName,
+        result: result
+      },
+      '*'
+    );
+
+    return result;
+  };
+}
 
 window.postMessage({type: 'WEBMCP_BRIDGE_READY'}, '*');

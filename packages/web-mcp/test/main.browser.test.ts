@@ -1,14 +1,11 @@
 import {describe, it, expect, vi} from 'vitest';
 import '../src/main.js';
-import {
-  type ToolDefinition,
-  ToolCallEvent,
-  type CallToolResult
-} from '../src/main.js';
+import {type ToolDefinition, type CallToolResult} from '../src/main.js';
 
 describe('provideContext', () => {
   it('should register tools', async () => {
-    const execute = vi.fn();
+    const content = {content: [{type: 'text', text: 'Echoed!'}]};
+    const execute = vi.fn().mockResolvedValue(content);
     const toolDefinition: ToolDefinition = {
       name: 'echo',
       description: 'Echoes the input',
@@ -22,29 +19,20 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.tools.define(toolDefinition);
+    navigator.modelContext!.registerTool(toolDefinition);
 
-    const toolCallEvent = new ToolCallEvent(
-      'echo',
-      {message: 'Hello, World!'},
-      () => {
-        return;
-      }
-    );
-
-    window.dispatchEvent(toolCallEvent);
+    const result = await navigator.modelContext!.executeTool('echo', {
+      message: 'Hello, World!'
+    });
 
     expect(execute).toHaveBeenCalledWith({message: 'Hello, World!'});
+    expect(result).toBe(content);
   });
 
-  it('should handle unknown tools gracefully', () => {
-    const respondWith = vi.fn();
-    const toolCallEvent = new ToolCallEvent('unknownTool', {}, respondWith);
+  it('should handle unknown tools gracefully', async () => {
+    const result = await navigator.modelContext!.executeTool('unknownTool', {});
 
-    expect(() => {
-      window.dispatchEvent(toolCallEvent);
-    }).not.toThrow();
-    expect(respondWith).toHaveBeenCalledWith({
+    expect(result).toEqual({
       isError: true,
       content: [
         {
@@ -68,22 +56,12 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.tools.define(toolDefinition);
+    navigator.modelContext!.registerTool(toolDefinition);
 
-    const respondWith = vi.fn().mockImplementation(() => {
-      return;
-    });
-    const toolCallEvent = new ToolCallEvent('failingTool', {}, respondWith);
-
-    expect(() => {
-      window.dispatchEvent(toolCallEvent);
-    }).not.toThrow();
-
-    // TODO(jg): wait for the respondWith call instead
-    await Promise.resolve();
+    const result = await navigator.modelContext!.executeTool('failingTool', {});
 
     expect(execute).toHaveBeenCalled();
-    expect(respondWith).toHaveBeenCalledWith({
+    expect(result).toEqual({
       isError: true,
       content: [
         {
@@ -95,12 +73,12 @@ describe('provideContext', () => {
   });
 
   it('should respond with tool results', async () => {
-    const result: CallToolResult = {
+    const callResult: CallToolResult = {
       content: [{type: 'text', text: 'Success'}]
     };
     const execute = vi
       .fn<() => Promise<CallToolResult>>()
-      .mockResolvedValue(result);
+      .mockResolvedValue(callResult);
     const toolDefinition: ToolDefinition = {
       name: 'successfulTool',
       description: 'A tool that succeeds',
@@ -112,17 +90,14 @@ describe('provideContext', () => {
       execute
     };
 
-    window.agent.tools.define(toolDefinition);
+    navigator.modelContext!.registerTool(toolDefinition);
 
-    const respondWith = vi.fn();
-    const toolCallEvent = new ToolCallEvent('successfulTool', {}, respondWith);
-
-    window.dispatchEvent(toolCallEvent);
-
-    // TODO(jg): wait for the respondWith call instead
-    await Promise.resolve();
+    const result = await navigator.modelContext!.executeTool(
+      'successfulTool',
+      {}
+    );
 
     expect(execute).toHaveBeenCalled();
-    expect(respondWith).toHaveBeenCalledWith(result);
+    expect(result).toEqual(callResult);
   });
 });

@@ -1,5 +1,78 @@
 import type {CallToolResult} from './mcp-types.js';
 
+export interface ModelContext {
+  clearContext(): void;
+  provideContext(context: ProvidedContext): void;
+  registerTool(tool: ToolDefinition): void;
+  unregisterTool(toolName: string): void;
+  executeTool(toolName: string, args: unknown): Promise<CallToolResult>;
+  list(): Iterable<ToolDefinitionInfo>;
+}
+
+export interface ProvidedContext {
+  tools?: ToolDefinition[];
+}
+
+export class ModelContextImpl implements ModelContext {
+  #tools: Map<string, ToolDefinition> = new Map();
+
+  clearContext(): void {
+    this.#tools.clear();
+  }
+
+  provideContext(context: ProvidedContext): void {
+    if (context.tools) {
+      for (const tool of context.tools) {
+        this.registerTool(tool);
+      }
+    }
+  }
+
+  registerTool(tool: ToolDefinition): void {
+    this.#tools.set(tool.name, tool);
+  }
+
+  unregisterTool(toolName: string): void {
+    this.#tools.delete(toolName);
+  }
+
+  *list(): Iterable<ToolDefinitionInfo> {
+    for (const tool of this.#tools.values()) {
+      const {execute, ...info} = tool;
+      yield info;
+    }
+  }
+
+  async executeTool(toolName: string, args: unknown): Promise<CallToolResult> {
+    const tool = this.#tools.get(toolName);
+    if (!tool) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Tool not found: ${toolName}`
+          }
+        ],
+        isError: true
+      };
+    }
+    try {
+      const result = await tool.execute(args);
+      return result;
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error executing tool ${toolName}: ${(error as Error).message}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+}
+
 export type {CallToolResult};
 
 export interface ToolDefinition {
@@ -11,123 +84,12 @@ export interface ToolDefinition {
 
 export type ToolDefinitionInfo = Omit<ToolDefinition, 'execute'>;
 
-export interface Agent {
-  tools: AgentToolRegistry;
-}
-
-export class ToolCallEvent extends Event {
-  name: string;
-  args: unknown;
-  #callback: (result: CallToolResult) => void;
-
-  constructor(
-    name: string,
-    args: unknown,
-    callback: (result: CallToolResult) => void
-  ) {
-    super('toolcall');
-    this.name = name;
-    this.args = args;
-    this.#callback = callback;
-  }
-
-  respondWith(result: CallToolResult) {
-    this.#callback(result);
-  }
-}
-
 declare global {
-  interface Window {
-    agent: Agent;
-    ToolCallEvent: typeof ToolCallEvent;
-  }
-
-  interface WindowEventMap {
-    toolcall: ToolCallEvent;
+  interface Navigator {
+    modelContext?: ModelContext;
   }
 }
 
-class AgentToolRegistry {
-  #tools: Map<string, ToolDefinition> = new Map();
-  #resolvers: Map<string, Array<(tool: ToolDefinition) => void>> = new Map();
-
-  *list(): Iterable<ToolDefinitionInfo> {
-    for (const tool of this.#tools.values()) {
-      const {execute, ...info} = tool;
-      yield info;
-    }
-  }
-
-  define(tool: ToolDefinition) {
-    this.#tools.set(tool.name, tool);
-    const resolvers = this.#resolvers.get(tool.name);
-    if (resolvers) {
-      for (const resolve of resolvers) {
-        resolve(tool);
-      }
-      this.#resolvers.delete(tool.name);
-    }
-  }
-
-  remove(name: string) {
-    this.#tools.delete(name);
-  }
-
-  get(name: string): ToolDefinition | undefined {
-    return this.#tools.get(name);
-  }
-
-  whenDefined(name: string): Promise<ToolDefinition> {
-    return new Promise((resolve) => {
-      const tool = this.#tools.get(name);
-      if (tool) {
-        resolve(tool);
-        return;
-      }
-      const resolvers = this.#resolvers.get(name) ?? [];
-      resolvers.push(resolve);
-      this.#resolvers.set(name, resolvers);
-    });
-  }
+if (!navigator.modelContext) {
+  navigator.modelContext = new ModelContextImpl();
 }
-
-if (!window.agent) {
-  window.agent = {
-    tools: new AgentToolRegistry()
-  };
-  window.ToolCallEvent = ToolCallEvent;
-}
-
-window.addEventListener('toolcall', async (event) => {
-  if (event.defaultPrevented) {
-    return;
-  }
-
-  const tool = window.agent.tools.get(event.name);
-  if (!tool) {
-    event.respondWith({
-      content: [
-        {
-          type: 'text',
-          text: `Tool not found: ${event.name}`
-        }
-      ],
-      isError: true
-    });
-    return;
-  }
-  try {
-    const result = await tool.execute(event.args);
-    event.respondWith(result);
-  } catch (error) {
-    event.respondWith({
-      content: [
-        {
-          type: 'text',
-          text: `Error executing tool ${event.name}: ${(error as Error).message}`
-        }
-      ],
-      isError: true
-    });
-  }
-});

@@ -7,9 +7,9 @@ function updateTools(
   currentDomain: string,
   currentPath: string
 ) {
-  if (!window.agent) {
+  if (!navigator.modelContext) {
     console.warn(
-      '[WebMCP DevTools] window.agent not available, user tools not registered'
+      '[WebMCP DevTools] navigator.modelContext not available, user tools not registered'
     );
     return;
   }
@@ -31,7 +31,7 @@ function updateTools(
 
       if (isEnabled && pathMatches) {
         try {
-          window.agent.tools.define(toolBinding.tool);
+          navigator.modelContext.registerTool(toolBinding.tool);
         } catch (error) {
           console.error(
             `[WebMCP DevTools] Failed to register tool ${toolBinding.tool.name}:`,
@@ -40,7 +40,7 @@ function updateTools(
         }
       } else {
         try {
-          window.agent.tools.remove(toolBinding.tool.name);
+          navigator.modelContext.unregisterTool(toolBinding.tool.name);
         } catch (error) {
           console.error(
             `[WebMCP DevTools] Failed to remove tool ${toolBinding.tool.name}:`,
