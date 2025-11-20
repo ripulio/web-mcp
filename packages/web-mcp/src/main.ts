@@ -69,6 +69,10 @@ class AgentToolRegistry {
     }
   }
 
+  remove(name: string) {
+    this.#tools.delete(name);
+  }
+
   get(name: string): ToolDefinition | undefined {
     return this.#tools.get(name);
   }

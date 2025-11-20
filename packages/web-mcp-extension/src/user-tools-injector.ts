@@ -2,22 +2,17 @@ import '@ripul/web-mcp';
 import {registry} from '@ripul/web-mcp-tools';
 import type {ToolGroupState} from './shared.js';
 
-(async () => {
+function updateTools(
+  enabledToolGroups: ToolGroupState,
+  currentDomain: string,
+  currentPath: string
+) {
   if (!window.agent) {
     console.warn(
       '[WebMCP DevTools] window.agent not available, user tools not registered'
     );
-    window.postMessage({type: 'WEBMCP_USER_TOOLS_READY'}, '*');
     return;
   }
-
-  const currentDomain = window.location.hostname;
-  const currentPath = window.location.pathname;
-
-  const result = await chrome.storage.sync.get<{
-    enabledToolGroups: ToolGroupState;
-  }>(['enabledToolGroups']);
-  const enabledToolGroups = result.enabledToolGroups || {};
 
   for (const entry of registry) {
     const domainMatches = entry.domains.some(
@@ -28,35 +23,40 @@ import type {ToolGroupState} from './shared.js';
       continue;
     }
 
-    const isEnabled = enabledToolGroups[entry.id] ?? true;
-
-    if (!isEnabled) {
-      console.log(
-        `[WebMCP DevTools] Skipping disabled tool group: ${entry.id} (${entry.domains.join(', ')})`
-      );
-      continue;
-    }
+    const isEnabled = enabledToolGroups[entry.id] !== false;
 
     for (const toolBinding of entry.tools) {
       const pathMatches =
         !toolBinding.pathMatches || toolBinding.pathMatches(currentPath);
 
-      if (pathMatches) {
+      if (isEnabled && pathMatches) {
         try {
           window.agent.tools.define(toolBinding.tool);
-          console.log(
-            `[WebMCP DevTools] Registered user tool: ${toolBinding.tool.name}`
-          );
         } catch (error) {
           console.error(
             `[WebMCP DevTools] Failed to register tool ${toolBinding.tool.name}:`,
             error
           );
         }
+      } else {
+        try {
+          window.agent.tools.remove(toolBinding.tool.name);
+        } catch (error) {
+          console.error(
+            `[WebMCP DevTools] Failed to remove tool ${toolBinding.tool.name}:`,
+            error
+          );
+        }
       }
     }
   }
+}
 
-  // Signal that user tools are ready
-  window.postMessage({type: 'WEBMCP_USER_TOOLS_READY'}, '*');
-})();
+window.postMessage({type: 'WEBMCP_INJECTOR_READY'}, '*');
+
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.data.type === 'WEBMCP_UPDATE_TOOLS') {
+    const {enabledToolGroups, currentDomain, currentPath} = event.data;
+    updateTools(enabledToolGroups, currentDomain, currentPath);
+  }
+});
