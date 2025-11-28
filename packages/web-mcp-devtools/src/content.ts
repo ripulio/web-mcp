@@ -1,5 +1,5 @@
 import type {ToolCallEventInfo} from './types.js';
-import type {CallToolResult} from '@ripul/web-mcp';
+import type {CallToolResult} from 'webmcp-polyfill';
 
 const bridgeReadyPromise = new Promise<void>((resolve) => {
   if (document.documentElement.hasAttribute('data-webmcp-bridge-injected')) {

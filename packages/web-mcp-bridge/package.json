@@ -28,7 +28,7 @@
     "build": "npm run build:typecheck && npm run build:js"
   },
   "devDependencies": {
-    "@ripul/web-mcp": "^0.0.1",
+    "webmcp-polyfill": "*",
     "typescript": "^5.9.2"
   },
   "dependencies": {

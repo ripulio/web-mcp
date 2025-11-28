@@ -1,4 +1,4 @@
-import '@ripul/web-mcp';
+import 'webmcp-polyfill';
 
 const USERS = [
   { id: 1, name: 'Alice Johnson', email: 'alice.johnson@example.com', role: 'Admin' },

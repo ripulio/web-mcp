@@ -1,21 +1,24 @@
-import '@ripul/web-mcp';
-import {registry} from '@ripul/web-mcp-tools';
-import type {ToolGroupState} from './shared.js';
+import 'webmcp-polyfill';
+import type {EnabledToolGroups} from './shared.js';
+
+const registeredTools = new Set<string>();
 
 function updateTools(
-  enabledToolGroups: ToolGroupState,
+  enabledToolGroups: EnabledToolGroups,
   currentDomain: string,
   currentPath: string
 ) {
   if (!navigator.modelContext) {
     console.warn(
-      '[WebMCP DevTools] navigator.modelContext not available, user tools not registered'
+      '[WebMCP] navigator.modelContext not available, user tools not registered'
     );
     return;
   }
 
-  for (const entry of registry) {
-    const domainMatches = entry.domains.some(
+  const toolsToRegister = new Set<string>();
+
+  for (const toolGroup of Object.values(enabledToolGroups)) {
+    const domainMatches = toolGroup.domains.some(
       (domain) => currentDomain === domain
     );
 
@@ -23,32 +26,42 @@ function updateTools(
       continue;
     }
 
-    const isEnabled = enabledToolGroups[entry.id] !== false;
+    const pathMatches =
+      !toolGroup.pathPattern ||
+      new RegExp(toolGroup.pathPattern).test(currentPath);
 
-    for (const toolBinding of entry.tools) {
-      const pathMatches =
-        !toolBinding.pathMatches || toolBinding.pathMatches(currentPath);
-
-      if (isEnabled && pathMatches) {
+    if (pathMatches) {
+      for (const tool of toolGroup.tools) {
         try {
-          navigator.modelContext.registerTool(toolBinding.tool);
+          // TODO (jg): user scripts
+          const toolFn = new Function('return ' + tool.source);
+          const toolObject = toolFn();
+
+          navigator.modelContext.registerTool(toolObject);
+          toolsToRegister.add(toolObject.name);
         } catch (error) {
           console.error(
-            `[WebMCP DevTools] Failed to register tool ${toolBinding.tool.name}:`,
-            error
-          );
-        }
-      } else {
-        try {
-          navigator.modelContext.unregisterTool(toolBinding.tool.name);
-        } catch (error) {
-          console.error(
-            `[WebMCP DevTools] Failed to remove tool ${toolBinding.tool.name}:`,
+            `[WebMCP DevTools] Failed to register tool from group ${toolGroup.name}:`,
             error
           );
         }
       }
     }
+  }
+
+  for (const toolName of registeredTools) {
+    if (!toolsToRegister.has(toolName)) {
+      try {
+        navigator.modelContext.unregisterTool(toolName);
+      } catch (error) {
+        console.error(`[WebMCP] Failed to unregister tool ${toolName}:`, error);
+      }
+    }
+  }
+
+  registeredTools.clear();
+  for (const toolName of toolsToRegister) {
+    registeredTools.add(toolName);
   }
 }
 

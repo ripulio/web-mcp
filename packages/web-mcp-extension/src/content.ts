@@ -1,4 +1,4 @@
-import type {ToolGroupState} from './shared.js';
+import type {EnabledToolGroups} from './shared.js';
 
 (async () => {
   const script = document.createElement('script');
@@ -28,7 +28,7 @@ import type {ToolGroupState} from './shared.js';
   });
 
   const result = await chrome.storage.sync.get<{
-    enabledToolGroups: ToolGroupState;
+    enabledToolGroups: EnabledToolGroups;
   }>(['enabledToolGroups']);
 
   window.postMessage(
