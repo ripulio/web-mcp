@@ -1,34 +1,58 @@
 import {render} from 'preact';
 import {useState, useEffect} from 'preact/hooks';
-import {registry, type ToolRegistryEntry} from '@ripul/web-mcp-tools';
-import type {ToolGroupState} from './shared.js';
+import type {EnabledToolGroups, StoredToolGroup} from './shared.js';
+import {searchTools, type ToolRegistryResult} from './tool-registry.js';
 
 function Panel() {
-  const [toolGroupStates, setToolGroupStates] = useState<ToolGroupState>({});
+  const [enabledToolGroups, setEnabledToolGroups] = useState<EnabledToolGroups>({});
+  const [registry, setRegistry] = useState<ToolRegistryResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    chrome.storage.sync.get<{enabledToolGroups: ToolGroupState}>(['enabledToolGroups'], (result) => {
-      const enabledToolGroups: ToolGroupState = result.enabledToolGroups || {};
+    (async () => {
+      const tools = await searchTools();
+      setRegistry(tools);
 
-      const initialState: ToolGroupState = {};
-      for (const entry of registry) {
-        initialState[entry.id] = enabledToolGroups[entry.id] ?? true;
-      }
-
-      setToolGroupStates(initialState);
-      setLoading(false);
-    });
+      chrome.storage.local.get<{enabledToolGroups: EnabledToolGroups}>(['enabledToolGroups'], (result) => {
+        const storedGroups: EnabledToolGroups = result.enabledToolGroups || {};
+        setEnabledToolGroups(storedGroups);
+        setLoading(false);
+      });
+    })();
   }, []);
 
   const handleToggle = (entryId: string) => {
-    const newState: ToolGroupState = {
-      ...toolGroupStates,
-      [entryId]: !toolGroupStates[entryId]
-    };
+    const isCurrentlyEnabled = enabledToolGroups[entryId] !== undefined;
+    let updatedGroups: EnabledToolGroups;
 
-    setToolGroupStates(newState);
-    chrome.storage.sync.set({enabledToolGroups: newState});
+    if (!isCurrentlyEnabled) {
+      const toolGroup = registry.find(entry => entry.id === entryId);
+
+      if (!toolGroup) {
+        return;
+      }
+
+      const storedGroup: StoredToolGroup = {
+        id: toolGroup.id,
+        name: toolGroup.name,
+        description: toolGroup.description,
+        domains: toolGroup.domains,
+        tools: toolGroup.tools.map(tool => ({
+          source: tool.source,
+          pathPattern: tool.pathPattern
+        }))
+      };
+      updatedGroups = {
+        ...enabledToolGroups,
+        [entryId]: storedGroup
+      };
+    } else {
+      const {[entryId]: _, ...rest} = enabledToolGroups;
+      updatedGroups = rest;
+    }
+
+    setEnabledToolGroups(updatedGroups);
+    chrome.storage.local.set({enabledToolGroups: updatedGroups});
   };
 
   if (loading) {
@@ -52,8 +76,8 @@ function Panel() {
       <div class="panel-content">
         <p>Enable or disable tool sets:</p>
 
-        {registry.map((entry: ToolRegistryEntry, index: number) => {
-          const isEnabled = toolGroupStates[entry.id] ?? true;
+        {registry.map((entry: ToolRegistryResult, index: number) => {
+          const isEnabled = enabledToolGroups[entry.id] !== undefined;
           const toolCount = entry.tools.length;
 
           return (

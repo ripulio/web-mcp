@@ -1,6 +1,6 @@
 import {render} from 'preact';
 import {useState, useEffect} from 'preact/hooks';
-import {type ToolDefinitionInfo} from '@ripul/web-mcp';
+import {type ToolDefinitionInfo} from 'webmcp-polyfill';
 import {dset} from 'dset';
 import type {ToolCallEventInfo} from './types.js';
 

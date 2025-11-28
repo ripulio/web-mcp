@@ -1,4 +1,4 @@
-import {type CallToolResult} from '@ripul/web-mcp';
+import {type CallToolResult} from 'webmcp-polyfill';
 
 export interface ToolCallEventInfo {
   timestamp: number;

@@ -1,4 +1,4 @@
-import type {ToolDefinitionInfo} from '@ripul/web-mcp';
+import type {ToolDefinitionInfo} from 'webmcp-polyfill';
 
 window.addEventListener('message', async (event: MessageEvent) => {
   if (event.source !== window) return;

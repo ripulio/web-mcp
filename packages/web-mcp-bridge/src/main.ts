@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import type {ToolDefinitionInfo, CallToolResult} from '@ripul/web-mcp';
+import type {ToolDefinitionInfo, CallToolResult} from 'webmcp-polyfill';
 import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {

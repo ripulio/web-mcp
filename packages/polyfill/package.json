@@ -1,7 +1,7 @@
 {
-  "name": "@ripul/web-mcp",
+  "name": "webmcp-polyfill",
   "version": "0.0.1",
-  "description": "A WebMCP implementation.",
+  "description": "A WebMCP browser polyfill.",
   "files": [
     "lib"
   ],

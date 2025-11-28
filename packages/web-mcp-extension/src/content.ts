@@ -1,4 +1,4 @@
-import type {ToolGroupState} from './shared.js';
+import type {EnabledToolGroups} from './shared.js';
 
 (async () => {
   const script = document.createElement('script');
@@ -27,8 +27,8 @@ import type {ToolGroupState} from './shared.js';
     window.addEventListener('message', listener);
   });
 
-  const result = await chrome.storage.sync.get<{
-    enabledToolGroups: ToolGroupState;
+  const result = await chrome.storage.local.get<{
+    enabledToolGroups: EnabledToolGroups;
   }>(['enabledToolGroups']);
 
   window.postMessage(
@@ -42,7 +42,7 @@ import type {ToolGroupState} from './shared.js';
   );
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'sync' && changes.enabledToolGroups) {
+    if (areaName === 'local' && changes.enabledToolGroups) {
       console.log('[WebMCP Extension] Tool groups changed, updating tools');
       window.postMessage(
         {
