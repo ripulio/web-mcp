@@ -1,5 +1,6 @@
 export interface ToolSource {
   source: string;
+  pathPattern?: string;
 }
 
 export interface ToolRegistryResult {
@@ -7,7 +8,6 @@ export interface ToolRegistryResult {
   name: string;
   description: string;
   domains: string[];
-  pathPattern?: string;
   tools: ToolSource[];
 }
 

@@ -3,9 +3,9 @@ export interface StoredToolGroup {
   name: string;
   description: string;
   domains: string[];
-  pathPattern?: string;
   tools: {
     source: string; // the .js file content
+    pathPattern?: string;
   }[];
 }
 

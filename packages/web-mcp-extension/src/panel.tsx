@@ -37,9 +37,9 @@ function Panel() {
         name: toolGroup.name,
         description: toolGroup.description,
         domains: toolGroup.domains,
-        pathPattern: toolGroup.pathPattern,
         tools: toolGroup.tools.map(tool => ({
-          source: tool.source
+          source: tool.source,
+          pathPattern: tool.pathPattern
         }))
       };
       updatedGroups = {

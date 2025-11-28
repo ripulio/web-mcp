@@ -26,25 +26,26 @@ function updateTools(
       continue;
     }
 
-    const pathMatches =
-      !toolGroup.pathPattern ||
-      new RegExp(toolGroup.pathPattern).test(currentPath);
+    for (const tool of toolGroup.tools) {
+      const pathMatches =
+        !tool.pathPattern || new RegExp(tool.pathPattern).test(currentPath);
 
-    if (pathMatches) {
-      for (const tool of toolGroup.tools) {
-        try {
-          // TODO (jg): user scripts
-          const toolFn = new Function('return ' + tool.source);
-          const toolObject = toolFn();
+      if (!pathMatches) {
+        continue;
+      }
 
-          navigator.modelContext.registerTool(toolObject);
-          toolsToRegister.add(toolObject.name);
-        } catch (error) {
-          console.error(
-            `[WebMCP DevTools] Failed to register tool from group ${toolGroup.name}:`,
-            error
-          );
-        }
+      try {
+        // TODO (jg): user scripts
+        const toolFn = new Function('return ' + tool.source);
+        const toolObject = toolFn();
+
+        navigator.modelContext.registerTool(toolObject);
+        toolsToRegister.add(toolObject.name);
+      } catch (error) {
+        console.error(
+          `[WebMCP DevTools] Failed to register tool from group ${toolGroup.name}:`,
+          error
+        );
       }
     }
   }
