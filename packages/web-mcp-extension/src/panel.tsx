@@ -1,5 +1,5 @@
 import { render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import type {
   EnabledToolGroups,
   StoredToolGroup,
@@ -22,6 +22,9 @@ function Panel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [updateAvailable, setUpdateAvailable] = useState<Set<string>>(new Set());
   const [checkingSource, setCheckingSource] = useState<string | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+  const [overflowingDescriptions, setOverflowingDescriptions] = useState<Set<string>>(new Set());
+  const descriptionRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
 
   const toggleExpand = (compositeId: string) => {
     setExpandedGroups((prev) => {
@@ -35,10 +38,28 @@ function Panel() {
     });
   };
 
-  const getToolName = (sourceUrl: string) => {
-    const filename = sourceUrl.split('/').pop() || sourceUrl;
-    return filename.replace(/\.js$/, '');
+  const toggleDescription = (key: string) => {
+    setExpandedDescriptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
+
+  // Check which descriptions are overflowing after render
+  useEffect(() => {
+    const newOverflowing = new Set<string>();
+    descriptionRefs.current.forEach((el, key) => {
+      if (el && el.scrollWidth > el.clientWidth) {
+        newOverflowing.add(key);
+      }
+    });
+    setOverflowingDescriptions(newOverflowing);
+  }, [registry, expandedGroups]);
 
   const isUrl = (str: string) => str.includes('://') || str.startsWith('www.');
 
@@ -65,7 +86,7 @@ function Panel() {
         entry.name,
         entry.description,
         ...entry.domains,
-        ...entry.tools.map(t => getToolName(t.sourceUrl)),
+        ...entry.tools.map(t => t.name),
         entry.baseUrl
       ].join(' ').toLowerCase();
       return searchable.includes(q);
@@ -185,8 +206,8 @@ function Panel() {
     try {
       const tools = await Promise.all(
         entry.tools.map(async (tool) => {
-          const source = await fetchToolSource(entry.baseUrl, tool.sourceUrl);
-          return { source, pathPattern: tool.pathPattern };
+          const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
+          return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
         })
       );
 
@@ -304,8 +325,8 @@ function Panel() {
     try {
       const tools = await Promise.all(
         entry.tools.map(async (tool) => {
-          const source = await fetchToolSource(entry.baseUrl, tool.sourceUrl);
-          return { source, pathPattern: tool.pathPattern };
+          const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
+          return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
         })
       );
 
@@ -346,8 +367,8 @@ function Panel() {
       try {
         const tools = await Promise.all(
           entry.tools.map(async (tool) => {
-            const source = await fetchToolSource(entry.baseUrl, tool.sourceUrl);
-            return { source, pathPattern: tool.pathPattern };
+            const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
+            return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
           })
         );
 
@@ -405,7 +426,7 @@ function Panel() {
   const formatSourceUrl = (url: string) => {
     try {
       const parsed = new URL(url);
-      return parsed.host + parsed.pathname.replace(/\/manifest\.json$/, '');
+      return parsed.host + parsed.pathname.replace(/\/servers\/index\.json$/, '');
     } catch {
       return url;
     }
@@ -471,7 +492,7 @@ function Panel() {
             <input
               type="text"
               class="source-input"
-              placeholder="https://example.com/manifest.json"
+              placeholder="https://example.com/servers/index.json"
               value={newSourceUrl}
               onInput={(e) => setNewSourceUrl((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddSource()}
@@ -625,10 +646,40 @@ function Panel() {
                               onChange={() => handleToolToggle(entry, index)}
                               disabled={isFetching}
                             />
-                            <span class="tool-name">{getToolName(tool.sourceUrl)}</span>
-                            {tool.pathPattern && (
-                              <span class="tool-path-pattern">{tool.pathPattern}</span>
-                            )}
+                            <div class="tool-content">
+                              <span class="tool-name">{tool.name}</span>
+                              {tool.pathPattern && (
+                                <span class="tool-path-pattern">{tool.pathPattern}</span>
+                              )}
+                              {tool.description && (() => {
+                                const descKey = `${compositeId}:${index}`;
+                                const isExpanded = expandedDescriptions.has(descKey);
+                                const isOverflowing = overflowingDescriptions.has(descKey);
+                                return (
+                                  <div class="tool-description-wrapper">
+                                    <span
+                                      class={`tool-description ${isExpanded ? 'expanded' : ''}`}
+                                      ref={(el) => {
+                                        if (el) descriptionRefs.current.set(descKey, el);
+                                      }}
+                                    >
+                                      {tool.description}
+                                    </span>
+                                    {(isOverflowing || isExpanded) && (
+                                      <button
+                                        class="toggle-desc-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleDescription(descKey);
+                                        }}
+                                      >
+                                        {isExpanded ? 'show less' : 'show more'}
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
                         );
                       })}

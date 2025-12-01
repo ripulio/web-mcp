@@ -12,9 +12,9 @@ export interface ToolRegistryResult {
   version: string;
   description: string;
   domains: string[];
-  tools: {sourceUrl: string; pathPattern?: string}[];
+  tools: {name: string; description: string; pathPattern?: string}[];
   sourceUrl: string; // which manifest this came from
-  baseUrl: string; // baseUrl from that manifest
+  baseUrl: string; // derived from manifest URL
 }
 
 // Session cache (in-memory)
@@ -93,19 +93,9 @@ async function getManifestWithCache(
 
   const manifest = await fetchManifest(url);
 
-  // Check if version changed (smart cache invalidation)
-  if (
-    cached &&
-    cached.manifestVersion === manifest.version &&
-    !isCacheStale(cached, cacheMode)
-  ) {
-    return cached.data;
-  }
-
   const entry: ManifestCacheEntry = {
     data: manifest,
-    fetchedAt: Date.now(),
-    manifestVersion: manifest.version
+    fetchedAt: Date.now()
   };
 
   await setCachedManifest(url, entry, cacheMode);
@@ -136,7 +126,11 @@ export async function searchTools(
 
     const {source, manifest} = result;
 
-    for (const group of manifest.registry) {
+    // Derive baseUrl from source URL (remove /servers/index.json)
+    const baseUrl = source.url.replace(/\/servers\/index\.json$/, '');
+
+    // manifest is now directly an array of tool groups
+    for (const group of manifest) {
       results.push({
         id: group.id,
         name: group.name,
@@ -145,7 +139,7 @@ export async function searchTools(
         domains: group.domains,
         tools: group.tools,
         sourceUrl: source.url,
-        baseUrl: manifest.baseUrl
+        baseUrl
       });
     }
   }
@@ -155,9 +149,10 @@ export async function searchTools(
 
 export async function fetchToolSource(
   baseUrl: string,
-  sourceUrl: string
+  groupId: string,
+  toolName: string
 ): Promise<string> {
-  const fullUrl = baseUrl + sourceUrl;
+  const fullUrl = `${baseUrl}/servers/${groupId}/tool/${toolName}.js`;
   const response = await fetch(fullUrl);
   if (!response.ok) {
     throw new Error(

@@ -320,9 +320,9 @@ body {
 
 .tool-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.375rem 0;
+  padding: 0.5rem 0;
   font-size: 0.875rem;
 }
 
@@ -330,6 +330,8 @@ body {
   width: 14px;
   height: 14px;
   cursor: pointer;
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .tool-name {
@@ -342,6 +344,43 @@ body {
   color: #999;
   font-family: monospace;
   margin-left: 0.5rem;
+}
+
+.tool-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tool-description-wrapper {
+  margin-top: 4px;
+}
+
+.tool-description {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-description.expanded {
+  white-space: normal;
+}
+
+.toggle-desc-btn {
+  background: none;
+  border: none;
+  color: #2196F3;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+}
+
+.toggle-desc-btn:hover {
+  text-decoration: underline;
 }
 
 .registry-actions {
