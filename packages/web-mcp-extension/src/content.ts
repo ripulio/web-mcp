@@ -1,7 +1,7 @@
 import type {EnabledToolGroups, StoredToolGroup} from './shared.js';
 
 export interface ToolToInject {
-  name: string;
+  toolId: string;
   source: string;
 }
 
@@ -84,16 +84,16 @@ async function evaluateAndInjectTools() {
 
     for (const toolIndex of enabledIndices) {
       const tool = toolGroup.tools[toolIndex];
-      if (!tool) continue; // Safety check
+      if (!tool || !tool.name) continue; // Safety check
 
       const pathMatches =
         !tool.pathPattern ||
         new RegExp(tool.pathPattern).test(window.location.pathname);
       if (pathMatches) {
-        // Use toolGroup.id + tool index as unique identifier
-        const toolId = `${toolGroup.id}:${toolIndex}`;
+        // Use groupId_toolName as stable, server-derived identifier
+        const toolId = `${toolGroup.id}_${tool.name}`;
         if (!currentlyRegisteredTools.has(toolId)) {
-          toolsToInject.push({name: toolGroup.name, source: tool.source});
+          toolsToInject.push({toolId, source: tool.source});
         }
         newToolNames.add(toolId);
       }

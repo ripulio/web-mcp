@@ -5,7 +5,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 interface ToolToInject {
-  name: string;
+  toolId: string;
   source: string;
 }
 
@@ -55,6 +55,7 @@ async function injectTools(tabId: number, tools: ToolToInject[]) {
 (() => {
   try {
     const tool = ${tool.source};
+    tool.name = '${tool.toolId}';
     navigator.modelContext.registerTool(tool);
   } catch (e) {
     console.error('[WebMCP] Failed to register tool:', e);
@@ -69,7 +70,7 @@ async function injectTools(tabId: number, tools: ToolToInject[]) {
       js: [{code: wrappedSource}]
     });
 
-    results.push({name: tool.name, result});
+    results.push({toolId: tool.toolId, result});
   }
 
   return {success: true, results};
