@@ -20,9 +20,11 @@ async function build() {
   try {
     console.log('Building WebMCP extension...');
 
-    // Build user-tools-injector.ts (injected into page to register user tools)
+    // Build user-tools-injector.ts (injected into page via userScripts.execute)
+    // Use IIFE format for plain script injection (not ES module)
     await esbuild.build({
       ...commonConfig,
+      format: 'iife',
       entryPoints: [join(srcDir, 'user-tools-injector.ts')],
       outfile: join(extensionDir, 'user-tools-injector.js')
     });

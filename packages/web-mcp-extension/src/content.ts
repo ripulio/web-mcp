@@ -1,23 +1,15 @@
-import type {EnabledToolGroups} from './shared.js';
+import type {EnabledToolGroups, StoredToolGroup} from './shared.js';
+
+export interface ToolToInject {
+  name: string;
+  source: string;
+}
+
+let currentlyRegisteredTools = new Set<string>();
 
 (async () => {
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('user-tools-injector.js');
-  script.type = 'module';
-  script.onload = () => {
-    console.log('[WebMCP Extension] User tools injector loaded');
-    script.remove();
-  };
-  script.onerror = (error) => {
-    console.error(
-      '[WebMCP Extension] Failed to load user tools injector:',
-      error
-    );
-  };
-
-  (document.head || document.documentElement).appendChild(script);
-
-  await new Promise<void>((resolve) => {
+  // Set up listener before requesting injection to avoid race condition
+  const injectorReady = new Promise<void>((resolve) => {
     const listener = (event: MessageEvent) => {
       if (event.data.type === 'WEBMCP_INJECTOR_READY') {
         window.removeEventListener('message', listener);
@@ -27,32 +19,109 @@ import type {EnabledToolGroups} from './shared.js';
     window.addEventListener('message', listener);
   });
 
-  const result = await chrome.storage.local.get<{
-    enabledToolGroups: EnabledToolGroups;
-  }>(['enabledToolGroups']);
+  // Inject polyfill first
+  await chrome.runtime.sendMessage({type: 'WEBMCP_INJECT_SCRIPT'});
+  await injectorReady;
 
-  window.postMessage(
-    {
-      type: 'WEBMCP_UPDATE_TOOLS',
-      enabledToolGroups: result.enabledToolGroups || {},
-      currentPath: window.location.pathname,
-      currentDomain: window.location.hostname
-    },
-    '*'
-  );
+  // Initial evaluation
+  await evaluateAndInjectTools();
 
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.enabledToolGroups) {
-      console.log('[WebMCP Extension] Tool groups changed, updating tools');
-      window.postMessage(
-        {
-          type: 'WEBMCP_UPDATE_TOOLS',
-          enabledToolGroups: changes.enabledToolGroups.newValue || {},
-          currentPath: window.location.pathname,
-          currentDomain: window.location.hostname
-        },
-        '*'
-      );
+  // SPA navigation detection
+  let lastUrl = window.location.href;
+
+  const onUrlChange = () => {
+    if (window.location.href !== lastUrl) {
+      lastUrl = window.location.href;
+      evaluateAndInjectTools();
+    }
+  };
+
+  // Intercept History API
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function (...args) {
+    originalPushState.apply(this, args);
+    onUrlChange();
+  };
+
+  history.replaceState = function (...args) {
+    originalReplaceState.apply(this, args);
+    onUrlChange();
+  };
+
+  window.addEventListener('popstate', onUrlChange);
+
+  // Storage changes
+  chrome.storage.local.onChanged.addListener((changes) => {
+    if (changes.enabledToolGroups) {
+      evaluateAndInjectTools();
     }
   });
 })();
+
+async function evaluateAndInjectTools() {
+  const result = await chrome.storage.local.get<{
+    enabledToolGroups: EnabledToolGroups;
+  }>(['enabledToolGroups']);
+  const enabledToolGroups = result.enabledToolGroups || {};
+
+  const toolsToInject: ToolToInject[] = [];
+  const newToolNames = new Set<string>();
+
+  for (const toolGroup of Object.values(
+    enabledToolGroups
+  ) as StoredToolGroup[]) {
+    const domainMatches = toolGroup.domains.some(
+      (domain) => window.location.hostname === domain
+    );
+    if (!domainMatches) continue;
+
+    // Only inject tools that are in enabledToolIndices
+    // Fallback to all tools for backwards compatibility with old stored groups
+    const enabledIndices =
+      toolGroup.enabledToolIndices || toolGroup.tools.map((_, i) => i);
+
+    for (const toolIndex of enabledIndices) {
+      const tool = toolGroup.tools[toolIndex];
+      if (!tool) continue; // Safety check
+
+      const pathMatches =
+        !tool.pathPattern ||
+        new RegExp(tool.pathPattern).test(window.location.pathname);
+      if (pathMatches) {
+        // Use toolGroup.id + tool index as unique identifier
+        const toolId = `${toolGroup.id}:${toolIndex}`;
+        if (!currentlyRegisteredTools.has(toolId)) {
+          toolsToInject.push({name: toolGroup.name, source: tool.source});
+        }
+        newToolNames.add(toolId);
+      }
+    }
+  }
+
+  // Unregister tools that no longer match
+  const toolsToUnregister = [...currentlyRegisteredTools].filter(
+    (name) => !newToolNames.has(name)
+  );
+
+  if (toolsToUnregister.length > 0) {
+    window.postMessage(
+      {
+        type: 'WEBMCP_UNREGISTER_TOOLS',
+        toolNames: toolsToUnregister
+      },
+      '*'
+    );
+  }
+
+  // Inject new tools via background
+  if (toolsToInject.length > 0) {
+    await chrome.runtime.sendMessage({
+      type: 'WEBMCP_INJECT_TOOLS',
+      tools: toolsToInject
+    });
+  }
+
+  currentlyRegisteredTools = newToolNames;
+}

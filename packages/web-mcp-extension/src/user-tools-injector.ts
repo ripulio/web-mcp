@@ -1,76 +1,18 @@
 import 'webmcp-polyfill';
-import type {EnabledToolGroups} from './shared.js';
 
-const registeredTools = new Set<string>();
-
-function updateTools(
-  enabledToolGroups: EnabledToolGroups,
-  currentDomain: string,
-  currentPath: string
-) {
-  if (!navigator.modelContext) {
-    console.warn(
-      '[WebMCP] navigator.modelContext not available, user tools not registered'
-    );
-    return;
-  }
-
-  const toolsToRegister = new Set<string>();
-
-  for (const toolGroup of Object.values(enabledToolGroups)) {
-    const domainMatches = toolGroup.domains.some(
-      (domain) => currentDomain === domain
-    );
-
-    if (!domainMatches) {
-      continue;
-    }
-
-    for (const tool of toolGroup.tools) {
-      const pathMatches =
-        !tool.pathPattern || new RegExp(tool.pathPattern).test(currentPath);
-
-      if (!pathMatches) {
-        continue;
-      }
-
-      try {
-        // TODO (jg): user scripts
-        const toolFn = new Function('return ' + tool.source);
-        const toolObject = toolFn();
-
-        navigator.modelContext.registerTool(toolObject);
-        toolsToRegister.add(toolObject.name);
-      } catch (error) {
-        console.error(
-          `[WebMCP DevTools] Failed to register tool from group ${toolGroup.name}:`,
-          error
-        );
-      }
-    }
-  }
-
-  for (const toolName of registeredTools) {
-    if (!toolsToRegister.has(toolName)) {
-      try {
-        navigator.modelContext.unregisterTool(toolName);
-      } catch (error) {
-        console.error(`[WebMCP] Failed to unregister tool ${toolName}:`, error);
-      }
-    }
-  }
-
-  registeredTools.clear();
-  for (const toolName of toolsToRegister) {
-    registeredTools.add(toolName);
-  }
-}
-
+// Signal that polyfill is ready
 window.postMessage({type: 'WEBMCP_INJECTOR_READY'}, '*');
 
+// Listen for unregister requests from content script
 window.addEventListener('message', (event: MessageEvent) => {
-  if (event.data.type === 'WEBMCP_UPDATE_TOOLS') {
-    const {enabledToolGroups, currentDomain, currentPath} = event.data;
-    updateTools(enabledToolGroups, currentDomain, currentPath);
+  if (event.data.type === 'WEBMCP_UNREGISTER_TOOLS' && navigator.modelContext) {
+    const toolNames: string[] = event.data.toolNames;
+    for (const name of toolNames) {
+      try {
+        navigator.modelContext.unregisterTool(name);
+      } catch (error) {
+        console.error(`[WebMCP] Failed to unregister tool ${name}:`, error);
+      }
+    }
   }
 });
