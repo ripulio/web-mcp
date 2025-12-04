@@ -1,21 +1,14 @@
-export interface StoredToolGroup {
-  id: string;
+export interface StoredTool {
   name: string;
-  version: string;
   description: string;
   domains: string[];
-  tools: {
-    source: string; // the .js file content
-    name: string;
-    description: string;
-    pathPattern?: string;
-  }[];
+  pathPattern?: string;
+  source: string; // the .js file content
   sourceUrl: string; // which manifest this came from
-  enabledToolIndices: number[]; // indices of enabled tools within this group
 }
 
-export interface EnabledToolGroups {
-  [entryId: string]: StoredToolGroup;
+export interface EnabledTools {
+  [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`
 }
 
 export type CacheMode =
@@ -35,7 +28,7 @@ export interface WebMCPSettings {
 }
 
 export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
-  url: 'https://ripulio.github.io/webmcp-tools/servers/index.json'
+  url: 'http://localhost:5176/api' // TODO: update when deployed
 };
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
@@ -43,25 +36,47 @@ export const DEFAULT_SETTINGS: WebMCPSettings = {
   packageSources: [DEFAULT_PACKAGE_SOURCE]
 };
 
-export interface RemoteToolGroup {
-  id: string;
+export interface RemoteTool {
   name: string;
-  version: string;
-  description: string;
+  userDescription: string;
   domains: string[];
-  tools: {
-    name: string;
-    description: string;
-    pathPattern?: string;
-  }[];
+  pathPattern?: string;
 }
 
-// RemoteManifest is now just an array of tool groups
+export interface RemoteToolGroup {
+  name: string;
+  description: string;
+  tools: RemoteTool[];
+}
+
 export type RemoteManifest = RemoteToolGroup[];
 
 export interface ManifestCacheEntry {
   data: RemoteManifest;
   fetchedAt: number;
+}
+
+// Types for grouped tool display in panel
+export interface ToolRegistryResult {
+  name: string;
+  description: string;
+  domains: string[];
+  pathPattern?: string;
+  sourceUrl: string;
+  baseUrl: string;
+}
+
+export interface ToolGroupResult {
+  name: string;
+  description: string;
+  tools: ToolRegistryResult[];
+}
+
+export interface GroupedToolRegistryResult {
+  sourceUrl: string;
+  baseUrl: string;
+  groups: ToolGroupResult[];
+  error?: string; // populated if fetch failed
 }
 
 export interface ManifestCache {

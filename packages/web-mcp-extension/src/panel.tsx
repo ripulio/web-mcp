@@ -1,42 +1,38 @@
 import { render } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type {
-  EnabledToolGroups,
-  StoredToolGroup,
+  EnabledTools,
+  StoredTool,
   CacheMode,
   PackageSource,
-  WebMCPSettings
+  WebMCPSettings,
+  GroupedToolRegistryResult,
+  ToolGroupResult,
+  ToolRegistryResult
 } from './shared.js';
 import { DEFAULT_SETTINGS } from './shared.js';
-import { searchTools, fetchToolSource, type ToolRegistryResult } from './tool-registry.js';
+import { searchToolsGrouped, fetchToolSource, validateSource } from './tool-registry.js';
+
+type GroupToggleState = 'all' | 'none' | 'partial';
 
 function Panel() {
-  const [enabledToolGroups, setEnabledToolGroups] = useState<EnabledToolGroups>({});
-  const [registry, setRegistry] = useState<ToolRegistryResult[]>([]);
+  const [enabledTools, setEnabledTools] = useState<EnabledTools>({});
+  const [groupedRegistry, setGroupedRegistry] = useState<GroupedToolRegistryResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<WebMCPSettings>(DEFAULT_SETTINGS);
   const [newSourceUrl, setNewSourceUrl] = useState('');
-  const [fetchingId, setFetchingId] = useState<string | null>(null);
+  const [fetchingIds, setFetchingIds] = useState<Set<string>>(new Set());
   const [fetchErrors, setFetchErrors] = useState<{ [id: string]: string }>({});
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [updateAvailable, setUpdateAvailable] = useState<Set<string>>(new Set());
-  const [checkingSource, setCheckingSource] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [overflowingDescriptions, setOverflowingDescriptions] = useState<Set<string>>(new Set());
   const descriptionRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
-
-  const toggleExpand = (compositeId: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(compositeId)) {
-        next.delete(compositeId);
-      } else {
-        next.add(compositeId);
-      }
-      return next;
-    });
-  };
+  // Source management state
+  const [sourceErrors, setSourceErrors] = useState<{ [url: string]: string }>({});
+  const [refreshingSource, setRefreshingSource] = useState<string | null>(null);
+  const [addingSource, setAddingSource] = useState(false);
+  const [addSourceError, setAddSourceError] = useState<string | null>(null);
 
   const toggleDescription = (key: string) => {
     setExpandedDescriptions((prev) => {
@@ -59,46 +55,90 @@ function Panel() {
       }
     });
     setOverflowingDescriptions(newOverflowing);
-  }, [registry, expandedGroups]);
+  }, [groupedRegistry]);
 
-  const isUrl = (str: string) => str.includes('://') || str.startsWith('www.');
-
-  const filterRegistry = (entries: ToolRegistryResult[], query: string) => {
-    if (!query.trim()) return entries;
-
-    const q = query.toLowerCase().trim();
-
-    if (isUrl(q)) {
-      // URL matching mode
-      try {
-        const url = new URL(q.startsWith('www.') ? `https://${q}` : q);
-        return entries.filter(entry =>
-          entry.domains.some(d => url.hostname === d || url.hostname.endsWith(`.${d}`))
-        );
-      } catch {
-        return entries; // Invalid URL, show all
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
       }
-    }
-
-    // Free text mode
-    return entries.filter(entry => {
-      const searchable = [
-        entry.name,
-        entry.description,
-        ...entry.domains,
-        ...entry.tools.map(t => t.name),
-        entry.baseUrl
-      ].join(' ').toLowerCase();
-      return searchable.includes(q);
+      return next;
     });
   };
 
-  const filteredRegistry = filterRegistry(registry, searchQuery);
+  const getGroupToggleState = (group: ToolGroupResult, sourceUrl: string): GroupToggleState => {
+    const enabledCount = group.tools.filter((tool) => {
+      const compositeId = `${sourceUrl}:${tool.name}`;
+      return !!enabledTools[compositeId];
+    }).length;
+
+    if (enabledCount === 0) return 'none';
+    if (enabledCount === group.tools.length) return 'all';
+    return 'partial';
+  };
+
+  const isUrl = (str: string) => str.includes('://') || str.startsWith('www.');
+
+  const matchesTool = (tool: ToolRegistryResult, query: string): boolean => {
+    const q = query.toLowerCase().trim();
+
+    if (isUrl(q)) {
+      try {
+        const url = new URL(q.startsWith('www.') ? `https://${q}` : q);
+        return tool.domains.some(d => url.hostname === d || url.hostname.endsWith(`.${d}`));
+      } catch {
+        return true;
+      }
+    }
+
+    const searchable = [
+      tool.name,
+      tool.description,
+      ...tool.domains,
+      tool.baseUrl
+    ].join(' ').toLowerCase();
+    return searchable.includes(q);
+  };
+
+  const filterGroupedRegistry = (
+    sources: GroupedToolRegistryResult[],
+    query: string
+  ): GroupedToolRegistryResult[] => {
+    if (!query.trim()) return sources;
+
+    return sources
+      .map((source) => ({
+        ...source,
+        groups: source.groups
+          .map((group) => ({
+            ...group,
+            tools: group.tools.filter((tool) => matchesTool(tool, query))
+          }))
+          .filter((group) => group.tools.length > 0)
+      }))
+      .filter((source) => source.groups.length > 0);
+  };
+
+  const filteredRegistry = filterGroupedRegistry(groupedRegistry, searchQuery);
 
   const loadRegistry = async (sources: PackageSource[], cacheMode: CacheMode) => {
     setLoading(true);
-    const tools = await searchTools(sources, cacheMode);
-    setRegistry(tools);
+    const results = await searchToolsGrouped(sources, cacheMode);
+
+    // Extract errors from results
+    const errors: { [url: string]: string } = {};
+    for (const r of results) {
+      if (r.error) {
+        errors[r.sourceUrl] = r.error;
+      }
+    }
+    setSourceErrors(errors);
+
+    // Store all results (including errored ones with empty groups)
+    setGroupedRegistry(results.filter((r) => !r.error));
     setLoading(false);
   };
 
@@ -106,15 +146,15 @@ function Panel() {
     (async () => {
       // Load settings first
       const result = await chrome.storage.local.get<{
-        enabledToolGroups: EnabledToolGroups;
+        enabledTools: EnabledTools;
         webmcpSettings: WebMCPSettings;
-      }>(['enabledToolGroups', 'webmcpSettings']);
+      }>(['enabledTools', 'webmcpSettings']);
 
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
-      const storedGroups: EnabledToolGroups = result.enabledToolGroups || {};
+      const storedTools: EnabledTools = result.enabledTools || {};
 
       setSettings(storedSettings);
-      setEnabledToolGroups(storedGroups);
+      setEnabledTools(storedTools);
 
       // Then load registry with those settings
       await loadRegistry(storedSettings.packageSources, storedSettings.cacheMode);
@@ -138,9 +178,6 @@ function Panel() {
     const newSettings = { ...settings, cacheMode: newCacheMode };
     await saveSettings(newSettings);
 
-    // Clear update badges when switching modes
-    setUpdateAvailable(new Set());
-
     // Only refetch when switching TO "none" (user expects fresh data)
     if (mode === 'none' && previousMode !== 'none') {
       await loadRegistry(newSettings.packageSources, newCacheMode);
@@ -157,108 +194,64 @@ function Panel() {
     await loadRegistry(settings.packageSources, 'none');
   };
 
-  const handleCheckUpdates = async (sourceUrl?: string) => {
-    const sourcesToCheck = sourceUrl
-      ? settings.packageSources.filter((s) => s.url === sourceUrl)
-      : settings.packageSources;
+  const handleRefreshSource = async (url: string) => {
+    setRefreshingSource(url);
 
-    if (sourceUrl) {
-      setCheckingSource(sourceUrl);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      // Force-fetch fresh manifests
-      const freshRegistry = await searchTools(sourcesToCheck, 'none');
-
-      // If checking all sources, update the full registry
-      if (!sourceUrl) {
-        setRegistry(freshRegistry);
-      }
-
-      // Find enabled groups with version mismatches
-      const newUpdateAvailable = new Set(updateAvailable);
-      for (const entry of freshRegistry) {
-        const compositeId = `${entry.sourceUrl}:${entry.id}`;
-        const storedGroup = enabledToolGroups[compositeId];
-        if (storedGroup && storedGroup.version !== entry.version) {
-          newUpdateAvailable.add(compositeId);
-        }
-      }
-      setUpdateAvailable(newUpdateAvailable);
-    } finally {
-      setCheckingSource(null);
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateGroup = async (entry: ToolRegistryResult) => {
-    const compositeId = `${entry.sourceUrl}:${entry.id}`;
-    if (!confirm(`Update "${entry.name}" to version ${entry.version}?`)) return;
-
-    setFetchingId(compositeId);
-    setFetchErrors((prev) => {
-      const { [compositeId]: _, ...rest } = prev;
+    // Clear any existing error for this source
+    setSourceErrors((prev) => {
+      const { [url]: _, ...rest } = prev;
       return rest;
     });
 
-    try {
-      const tools = await Promise.all(
-        entry.tools.map(async (tool) => {
-          const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
-          return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
-        })
-      );
+    const result = await validateSource(url);
 
-      // Preserve enabled indices if possible, otherwise enable all
-      const existingGroup = enabledToolGroups[compositeId];
-      const enabledIndices = existingGroup
-        ? existingGroup.enabledToolIndices.filter((i) => i < tools.length)
-        : tools.map((_, i) => i);
-
-      const updatedGroup: StoredToolGroup = {
-        id: entry.id,
-        name: entry.name,
-        version: entry.version,
-        description: entry.description,
-        domains: entry.domains,
-        tools,
-        sourceUrl: entry.sourceUrl,
-        enabledToolIndices: enabledIndices.length > 0 ? enabledIndices : tools.map((_, i) => i)
-      };
-
-      const updatedGroups = { ...enabledToolGroups, [compositeId]: updatedGroup };
-      setEnabledToolGroups(updatedGroups);
-      await chrome.storage.local.set({ enabledToolGroups: updatedGroups });
-
-      // Remove from update available set
-      setUpdateAvailable((prev) => {
-        const next = new Set(prev);
-        next.delete(compositeId);
-        return next;
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update tools';
-      setFetchErrors((prev) => ({ ...prev, [compositeId]: message }));
-    } finally {
-      setFetchingId(null);
+    if (!result.valid) {
+      setSourceErrors((prev) => ({ ...prev, [url]: result.error! }));
+      // Remove from registry if it was previously successful
+      setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+    } else {
+      // Reload just this source's tools
+      const results = await searchToolsGrouped([{ url }], 'none');
+      const sourceResult = results[0];
+      if (sourceResult && !sourceResult.error) {
+        setGroupedRegistry((prev) => {
+          const filtered = prev.filter((r) => r.sourceUrl !== url);
+          return [...filtered, sourceResult];
+        });
+      }
     }
+
+    setRefreshingSource(null);
   };
 
   const handleAddSource = async () => {
     const url = newSourceUrl.trim();
     if (!url) return;
 
+    // Clear previous error
+    setAddSourceError(null);
+
     // Basic URL validation
     try {
       new URL(url);
     } catch {
+      setAddSourceError('Invalid URL format');
       return;
     }
 
     // Check for duplicates
     if (settings.packageSources.some((s) => s.url === url)) {
+      setAddSourceError('Source already exists');
+      return;
+    }
+
+    // Validate the source can be fetched
+    setAddingSource(true);
+    const result = await validateSource(url);
+
+    if (!result.valid) {
+      setAddSourceError(result.error || 'Failed to fetch source');
+      setAddingSource(false);
       return;
     }
 
@@ -270,163 +263,152 @@ function Panel() {
 
     await saveSettings(newSettings);
     setNewSourceUrl('');
+    setAddingSource(false);
 
     // Reload registry with new source
     await loadRegistry(newSettings.packageSources, newSettings.cacheMode);
   };
 
   const handleRemoveSource = async (url: string) => {
+    // Clear any error for this source
+    setSourceErrors((prev) => {
+      const { [url]: _, ...rest } = prev;
+      return rest;
+    });
+
+    // Remove from registry immediately (no loading state)
+    setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+
     const newSettings = {
       ...settings,
       packageSources: settings.packageSources.filter((s) => s.url !== url)
     };
 
     await saveSettings(newSettings);
-
-    // Reload registry without removed source
-    await loadRegistry(newSettings.packageSources, newSettings.cacheMode);
   };
 
-  const handleToggle = async (entry: ToolRegistryResult) => {
-    const compositeId = `${entry.sourceUrl}:${entry.id}`;
-    const storedGroup = enabledToolGroups[compositeId];
-    const hasAnyEnabled = storedGroup && storedGroup.enabledToolIndices.length > 0;
+  const handleToolToggle = async (entry: ToolRegistryResult) => {
+    const compositeId = `${entry.sourceUrl}:${entry.name}`;
+    const storedTool = enabledTools[compositeId];
 
-    if (hasAnyEnabled) {
-      // Disable all - remove from storage
-      const { [compositeId]: _, ...rest } = enabledToolGroups;
-      setEnabledToolGroups(rest);
-      await chrome.storage.local.set({ enabledToolGroups: rest });
+    if (storedTool) {
+      // Disable - remove from storage
+      const { [compositeId]: _, ...rest } = enabledTools;
+      setEnabledTools(rest);
+      await chrome.storage.local.set({ enabledTools: rest });
       return;
     }
 
-    // Enable all - check if we need to fetch sources
-    const needsFetch = !storedGroup || storedGroup.version !== entry.version;
-
-    if (!needsFetch && storedGroup) {
-      // Already have up-to-date sources, just enable all
-      const updatedGroup: StoredToolGroup = {
-        ...storedGroup,
-        enabledToolIndices: storedGroup.tools.map((_, i) => i)
-      };
-      const updatedGroups = { ...enabledToolGroups, [compositeId]: updatedGroup };
-      setEnabledToolGroups(updatedGroups);
-      await chrome.storage.local.set({ enabledToolGroups: updatedGroups });
-      return;
-    }
-
-    // Need to fetch tool sources
-    setFetchingId(compositeId);
+    // Enable - fetch tool source
+    setFetchingIds((prev) => new Set(prev).add(compositeId));
     setFetchErrors((prev) => {
       const { [compositeId]: _, ...rest } = prev;
       return rest;
     });
 
     try {
-      const tools = await Promise.all(
-        entry.tools.map(async (tool) => {
-          const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
-          return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
-        })
-      );
+      const source = await fetchToolSource(entry.baseUrl, entry.name);
 
-      const storedGroup: StoredToolGroup = {
-        id: entry.id,
+      const storedTool: StoredTool = {
         name: entry.name,
-        version: entry.version,
         description: entry.description,
         domains: entry.domains,
-        tools,
-        sourceUrl: entry.sourceUrl,
-        enabledToolIndices: tools.map((_, i) => i) // Enable all by default
+        pathPattern: entry.pathPattern,
+        source,
+        sourceUrl: entry.sourceUrl
       };
 
-      const updatedGroups = { ...enabledToolGroups, [compositeId]: storedGroup };
-      setEnabledToolGroups(updatedGroups);
-      await chrome.storage.local.set({ enabledToolGroups: updatedGroups });
+      const updatedTools = { ...enabledTools, [compositeId]: storedTool };
+      setEnabledTools(updatedTools);
+      await chrome.storage.local.set({ enabledTools: updatedTools });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch tools';
+      const message = error instanceof Error ? error.message : 'Failed to fetch tool';
       setFetchErrors((prev) => ({ ...prev, [compositeId]: message }));
     } finally {
-      setFetchingId(null);
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(compositeId);
+        return next;
+      });
     }
   };
 
-  const handleToolToggle = async (entry: ToolRegistryResult, toolIndex: number) => {
-    const compositeId = `${entry.sourceUrl}:${entry.id}`;
-    const storedGroup = enabledToolGroups[compositeId];
+  const handleGroupToggle = async (group: ToolGroupResult, sourceUrl: string, baseUrl: string) => {
+    const currentState = getGroupToggleState(group, sourceUrl);
+    const shouldEnable = currentState !== 'all';
 
-    if (!storedGroup) {
-      // Need to fetch sources first, then enable just this tool
-      setFetchingId(compositeId);
-      setFetchErrors((prev) => {
-        const { [compositeId]: _, ...rest } = prev;
-        return rest;
+    if (shouldEnable) {
+      // Enable all tools that aren't already enabled
+      const toolsToEnable = group.tools.filter((tool) => {
+        const compositeId = `${sourceUrl}:${tool.name}`;
+        return !enabledTools[compositeId];
       });
 
-      try {
-        const tools = await Promise.all(
-          entry.tools.map(async (tool) => {
-            const source = await fetchToolSource(entry.baseUrl, entry.id, tool.name);
-            return { source, name: tool.name, description: tool.description, pathPattern: tool.pathPattern };
-          })
-        );
+      // Mark all as fetching
+      const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
 
-        const newGroup: StoredToolGroup = {
-          id: entry.id,
-          name: entry.name,
-          version: entry.version,
-          description: entry.description,
-          domains: entry.domains,
-          tools,
-          sourceUrl: entry.sourceUrl,
-          enabledToolIndices: [toolIndex] // Only enable this tool
-        };
+      // Fetch all in parallel
+      const results = await Promise.allSettled(
+        toolsToEnable.map(async (tool) => {
+          const compositeId = `${sourceUrl}:${tool.name}`;
+          const source = await fetchToolSource(baseUrl, tool.name);
+          return {
+            compositeId,
+            storedTool: {
+              name: tool.name,
+              description: tool.description,
+              domains: tool.domains,
+              pathPattern: tool.pathPattern,
+              source,
+              sourceUrl
+            } as StoredTool
+          };
+        })
+      );
 
-        const updatedGroups = { ...enabledToolGroups, [compositeId]: newGroup };
-        setEnabledToolGroups(updatedGroups);
-        await chrome.storage.local.set({ enabledToolGroups: updatedGroups });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to fetch tools';
-        setFetchErrors((prev) => ({ ...prev, [compositeId]: message }));
-      } finally {
-        setFetchingId(null);
+      // Process results
+      const updatedTools = { ...enabledTools };
+      const newErrors: { [id: string]: string } = {};
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const compositeId = `${sourceUrl}:${toolsToEnable[i].name}`;
+        if (result.status === 'fulfilled') {
+          updatedTools[result.value.compositeId] = result.value.storedTool;
+        } else {
+          newErrors[compositeId] = result.reason?.message || 'Failed to fetch tool';
+        }
       }
-      return;
-    }
 
-    // Update enabledToolIndices
-    const currentIndices = storedGroup.enabledToolIndices || [];
-    const isToolEnabled = currentIndices.includes(toolIndex);
-
-    let newIndices: number[];
-    if (isToolEnabled) {
-      newIndices = currentIndices.filter((i) => i !== toolIndex);
+      setEnabledTools(updatedTools);
+      await chrome.storage.local.set({ enabledTools: updatedTools });
+      setFetchErrors((prev) => ({ ...prev, ...newErrors }));
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
     } else {
-      newIndices = [...currentIndices, toolIndex].sort((a, b) => a - b);
-    }
-
-    if (newIndices.length === 0) {
-      // Remove group entirely
-      const { [compositeId]: _, ...rest } = enabledToolGroups;
-      setEnabledToolGroups(rest);
-      await chrome.storage.local.set({ enabledToolGroups: rest });
-    } else {
-      // Update group with new indices
-      const updatedGroup: StoredToolGroup = {
-        ...storedGroup,
-        enabledToolIndices: newIndices
-      };
-      const updatedGroups = { ...enabledToolGroups, [compositeId]: updatedGroup };
-      setEnabledToolGroups(updatedGroups);
-      await chrome.storage.local.set({ enabledToolGroups: updatedGroups });
+      // Disable all tools in group
+      const updatedTools = { ...enabledTools };
+      for (const tool of group.tools) {
+        const compositeId = `${sourceUrl}:${tool.name}`;
+        delete updatedTools[compositeId];
+      }
+      setEnabledTools(updatedTools);
+      await chrome.storage.local.set({ enabledTools: updatedTools });
     }
   };
 
   const formatSourceUrl = (url: string) => {
     try {
       const parsed = new URL(url);
-      return parsed.host + parsed.pathname.replace(/\/servers\/index\.json$/, '');
+      return parsed.host + parsed.pathname.replace(/\/$/, '');
     } catch {
       return url;
     }
@@ -449,58 +431,63 @@ function Panel() {
     <div class="panel">
       <div class="panel-header">
         <h1 class="panel-title">WebMCP Settings</h1>
-        {settings.cacheMode === 'manual' ? (
-          <button class="refresh-btn" onClick={() => handleCheckUpdates()} disabled={loading}>
-            {loading ? 'Checking...' : 'Check for Updates'}
-          </button>
-        ) : (
-          <button class="refresh-btn" onClick={handleRefresh} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
-        )}
+        <button class="refresh-btn" onClick={handleRefresh} disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
       <div class="panel-content">
         {/* Package Sources Section */}
         <div class="settings-section">
           <h2 class="section-title">Sources</h2>
           <div class="source-list">
-            {settings.packageSources.map((source) => (
-              <div key={source.url} class="source-item">
-                <span class="source-url">{formatSourceUrl(source.url)}</span>
-                <div class="source-actions">
-                  {settings.cacheMode === 'manual' && (
+            {settings.packageSources.map((source) => {
+              const hasError = !!sourceErrors[source.url];
+              const isRefreshing = refreshingSource === source.url;
+
+              return (
+                <div key={source.url} class={`source-item ${hasError ? 'error' : ''}`}>
+                  <div class="source-info">
+                    {hasError && <span class="source-error-icon" title={sourceErrors[source.url]}>!</span>}
+                    <span class="source-url">{formatSourceUrl(source.url)}</span>
+                  </div>
+                  <div class="source-actions">
                     <button
-                      class="check-btn"
-                      onClick={() => handleCheckUpdates(source.url)}
-                      disabled={checkingSource === source.url}
+                      class={`source-refresh-btn ${isRefreshing ? 'spinning' : ''}`}
+                      onClick={() => handleRefreshSource(source.url)}
+                      disabled={isRefreshing}
+                      title="Refresh source"
                     >
-                      {checkingSource === source.url ? 'Checking...' : 'Check'}
+                      ↻
                     </button>
-                  )}
-                  <button
-                    class="remove-btn"
-                    onClick={() => handleRemoveSource(source.url)}
-                    title="Remove source"
-                  >
-                    ×
-                  </button>
+                    <button
+                      class="remove-btn"
+                      onClick={() => handleRemoveSource(source.url)}
+                      title="Remove source"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div class="add-source">
             <input
               type="text"
               class="source-input"
-              placeholder="https://example.com/servers/index.json"
+              placeholder="https://example.com/"
               value={newSourceUrl}
-              onInput={(e) => setNewSourceUrl((e.target as HTMLInputElement).value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddSource()}
+              onInput={(e) => {
+                setNewSourceUrl((e.target as HTMLInputElement).value);
+                setAddSourceError(null);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && !addingSource && handleAddSource()}
             />
-            <button class="add-btn" onClick={handleAddSource}>
-              Add
+            <button class="add-btn" onClick={handleAddSource} disabled={addingSource}>
+              {addingSource ? '...' : 'Add'}
             </button>
           </div>
+          {addSourceError && <div class="add-source-error">{addSourceError}</div>}
         </div>
 
         {/* Cache Mode Section */}
@@ -558,7 +545,7 @@ function Panel() {
           </div>
         </div>
 
-        {/* Tool Groups Section */}
+        {/* Tools Section */}
         <div class="settings-section">
           <h2 class="section-title">Available Tools</h2>
           <input
@@ -575,120 +562,117 @@ function Panel() {
               <p class="no-tools">No tools available from configured sources.</p>
             )
           ) : (
-            filteredRegistry.map((entry) => {
-              const compositeId = `${entry.sourceUrl}:${entry.id}`;
-              const storedGroup = enabledToolGroups[compositeId];
-              const enabledIndices = storedGroup?.enabledToolIndices || [];
-              const someEnabled = enabledIndices.length > 0;
-              const allEnabled = enabledIndices.length === entry.tools.length;
-              const isPartial = someEnabled && !allEnabled;
-              const isFetching = fetchingId === compositeId;
-              const error = fetchErrors[compositeId];
-              const toolCount = entry.tools.length;
-              const isExpanded = expandedGroups.has(compositeId);
+            filteredRegistry.map((source) =>
+              source.groups.map((group) => {
+                const groupId = `${source.sourceUrl}:${group.name}`;
+                const isExpanded = expandedGroups.has(groupId);
+                const toggleState = getGroupToggleState(group, source.sourceUrl);
+                const isGroupFetching = group.tools.some((t) =>
+                  fetchingIds.has(`${source.sourceUrl}:${t.name}`)
+                );
 
-              return (
-                <div key={compositeId} class="registry-entry">
-                  <div class="registry-row">
-                    <div
-                      class="registry-header"
-                      onClick={() => toggleExpand(compositeId)}
-                    >
+                return (
+                  <div key={groupId} class="tool-group">
+                    <div class="group-header" onClick={() => toggleGroup(groupId)}>
                       <span class={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
-                      <div class="registry-info">
-                        <span class="registry-name">{entry.name}</span>
-                        <span class="registry-tool-count">
-                          {toolCount} tool{toolCount !== 1 ? 's' : ''}
-                        </span>
-                        <span class="registry-source">{formatSourceUrl(entry.baseUrl)}</span>
-                        <div class="registry-domains">
-                          {entry.domains.map((domain) => (
-                            <span key={domain} class="domain-pill">{domain}</span>
-                          ))}
+                      <div class="group-info">
+                        <div class="group-title-row">
+                          <span class="group-name">{group.name}</span>
+                          <span class="group-tool-count">{group.tools.length} tools</span>
                         </div>
+                        {group.description && (
+                          <span class="group-description">{group.description}</span>
+                        )}
                       </div>
-                    </div>
-                    <div class="registry-actions">
-                      {updateAvailable.has(compositeId) && (
-                        <button
-                          class="update-badge"
-                          onClick={() => handleUpdateGroup(entry)}
-                          disabled={isFetching}
-                        >
-                          Update available
-                        </button>
-                      )}
-                      {isFetching ? (
-                        <span class="fetching">Loading...</span>
-                      ) : (
-                        <label class={`toggle-switch ${isPartial ? 'partial' : ''}`}>
-                          <input
-                            type="checkbox"
-                            checked={someEnabled}
-                            onChange={() => handleToggle(entry)}
-                            disabled={isFetching}
-                          />
-                          <span class="toggle-slider"></span>
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                  {isExpanded && (
-                    <div class="tools-list">
-                      {entry.tools.map((tool, index) => {
-                        const isToolEnabled = enabledIndices.includes(index);
-                        return (
-                          <div key={index} class="tool-item">
+                      <div class="group-actions" onClick={(e) => e.stopPropagation()}>
+                        {isGroupFetching ? (
+                          <span class="fetching">Loading...</span>
+                        ) : (
+                          <label class={`toggle-switch ${toggleState === 'partial' ? 'partial' : ''}`}>
                             <input
                               type="checkbox"
-                              class="tool-checkbox"
-                              checked={isToolEnabled}
-                              onChange={() => handleToolToggle(entry, index)}
-                              disabled={isFetching}
+                              checked={toggleState !== 'none'}
+                              onChange={() => handleGroupToggle(group, source.sourceUrl, source.baseUrl)}
                             />
-                            <div class="tool-content">
-                              <span class="tool-name">{tool.name}</span>
-                              {tool.pathPattern && (
-                                <span class="tool-path-pattern">{tool.pathPattern}</span>
-                              )}
-                              {tool.description && (() => {
-                                const descKey = `${compositeId}:${index}`;
-                                const isExpanded = expandedDescriptions.has(descKey);
-                                const isOverflowing = overflowingDescriptions.has(descKey);
-                                return (
-                                  <div class="tool-description-wrapper">
-                                    <span
-                                      class={`tool-description ${isExpanded ? 'expanded' : ''}`}
-                                      ref={(el) => {
-                                        if (el) descriptionRefs.current.set(descKey, el);
+                            <span class="toggle-slider"></span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div class="tools-list">
+                        {group.tools.map((entry) => {
+                          const compositeId = `${entry.sourceUrl}:${entry.name}`;
+                          const isEnabled = !!enabledTools[compositeId];
+                          const isFetching = fetchingIds.has(compositeId);
+                          const error = fetchErrors[compositeId];
+                          const descKey = compositeId;
+                          const isDescExpanded = expandedDescriptions.has(descKey);
+                          const isOverflowing = overflowingDescriptions.has(descKey);
+
+                          return (
+                            <div key={compositeId} class="registry-entry">
+                              <div class="registry-row">
+                                <div class="registry-info">
+                                  <span class="registry-name">{entry.name}</span>
+                                  {entry.pathPattern && (
+                                    <span class="tool-path-pattern">{entry.pathPattern}</span>
+                                  )}
+                                  <div class="registry-domains">
+                                    {entry.domains.map((domain) => (
+                                      <span key={domain} class="domain-pill">{domain}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div class="registry-actions">
+                                  {isFetching ? (
+                                    <span class="fetching">Loading...</span>
+                                  ) : (
+                                    <label class="toggle-switch">
+                                      <input
+                                        type="checkbox"
+                                        checked={isEnabled}
+                                        onChange={() => handleToolToggle(entry)}
+                                        disabled={isFetching}
+                                      />
+                                      <span class="toggle-slider"></span>
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
+                              {entry.description && (
+                                <div class="tool-description-wrapper">
+                                  <span
+                                    class={`tool-description ${isDescExpanded ? 'expanded' : ''}`}
+                                    ref={(el) => {
+                                      if (el) descriptionRefs.current.set(descKey, el);
+                                    }}
+                                  >
+                                    {entry.description}
+                                  </span>
+                                  {(isOverflowing || isDescExpanded) && (
+                                    <button
+                                      class="toggle-desc-btn"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleDescription(descKey);
                                       }}
                                     >
-                                      {tool.description}
-                                    </span>
-                                    {(isOverflowing || isExpanded) && (
-                                      <button
-                                        class="toggle-desc-btn"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleDescription(descKey);
-                                        }}
-                                      >
-                                        {isExpanded ? 'show less' : 'show more'}
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                                      {isDescExpanded ? 'show less' : 'show more'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {error && <div class="fetch-error">{error}</div>}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {error && <div class="fetch-error">{error}</div>}
-                </div>
-              );
-            })
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )
           )}
         </div>
       </div>

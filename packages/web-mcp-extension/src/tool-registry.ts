@@ -2,30 +2,59 @@ import type {
   CacheMode,
   PackageSource,
   RemoteManifest,
+  RemoteTool,
   ManifestCache,
-  ManifestCacheEntry
+  ManifestCacheEntry,
+  ToolRegistryResult,
+  GroupedToolRegistryResult
 } from './shared.js';
 
-export interface ToolRegistryResult {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  domains: string[];
-  tools: {name: string; description: string; pathPattern?: string}[];
-  sourceUrl: string; // which manifest this came from
-  baseUrl: string; // derived from manifest URL
-}
+export type {ToolRegistryResult, GroupedToolRegistryResult};
 
 // Session cache (in-memory)
 const sessionCache: ManifestCache = {};
 
-async function fetchManifest(url: string): Promise<RemoteManifest> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch manifest from ${url}: ${response.status}`);
+interface ToolGroupResponse {
+  name: string;
+  description: string;
+  tools: string[];
+}
+
+async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
+  // Fetch groups from catalog API
+  const groupsUrl = `${baseUrl.replace(/\/$/, '')}/groups`;
+  const groupsResponse = await fetch(groupsUrl);
+  if (!groupsResponse.ok) {
+    throw new Error(
+      `Failed to fetch groups from ${groupsUrl}: ${groupsResponse.status}`
+    );
   }
-  return response.json();
+  const groupsData: ToolGroupResponse[] = await groupsResponse.json();
+
+  // Fetch all tool metadata from catalog API (in parallel)
+  const apiBaseUrl = baseUrl.replace(/\/$/, '');
+
+  // Build a map of tool name -> RemoteTool for deduplication
+  const allToolNames = new Set(groupsData.flatMap((g) => g.tools));
+  const toolMap = new Map<string, RemoteTool>();
+
+  await Promise.all(
+    Array.from(allToolNames).map(async (name) => {
+      const res = await fetch(`${apiBaseUrl}/tools/${name}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch tool ${name}: ${res.status}`);
+      }
+      const tool = (await res.json()) as RemoteTool;
+      toolMap.set(name, tool);
+    })
+  );
+
+  // Build grouped manifest
+  return groupsData.map((group) => ({
+    name: group.name,
+    description: group.description,
+    tools: group.tools.map((name) => toolMap.get(name)!)
+  }));
 }
 
 async function getCachedManifest(
@@ -102,57 +131,72 @@ async function getManifestWithCache(
   return manifest;
 }
 
+export async function searchToolsGrouped(
+  sources: PackageSource[],
+  cacheMode: CacheMode
+): Promise<GroupedToolRegistryResult[]> {
+  // Fetch all manifests in parallel
+  const manifestPromises = sources.map(async (source) => {
+    const baseUrl = source.url.replace(/\/$/, '');
+    try {
+      const manifest = await getManifestWithCache(source.url, cacheMode);
+      return {
+        sourceUrl: source.url,
+        baseUrl,
+        groups: manifest.map((group) => ({
+          name: group.name,
+          description: group.description,
+          tools: group.tools.map((tool) => ({
+            name: tool.name,
+            description: tool.userDescription,
+            domains: tool.domains,
+            pathPattern: tool.pathPattern,
+            sourceUrl: source.url,
+            baseUrl
+          }))
+        }))
+      } as GroupedToolRegistryResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch';
+      return {
+        sourceUrl: source.url,
+        baseUrl,
+        groups: [],
+        error: message
+      } as GroupedToolRegistryResult;
+    }
+  });
+
+  return Promise.all(manifestPromises);
+}
+
+export async function validateSource(
+  url: string
+): Promise<{valid: boolean; error?: string}> {
+  try {
+    await fetchManifest(url);
+    return {valid: true};
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch';
+    return {valid: false, error: message};
+  }
+}
+
 export async function searchTools(
   sources: PackageSource[],
   cacheMode: CacheMode
 ): Promise<ToolRegistryResult[]> {
-  const results: ToolRegistryResult[] = [];
-
-  // Fetch all manifests in parallel
-  const manifestPromises = sources.map(async (source) => {
-    try {
-      const manifest = await getManifestWithCache(source.url, cacheMode);
-      return {source, manifest};
-    } catch (error) {
-      console.error(`Failed to fetch manifest from ${source.url}:`, error);
-      return null;
-    }
-  });
-
-  const manifests = await Promise.all(manifestPromises);
-
-  for (const result of manifests) {
-    if (!result) continue;
-
-    const {source, manifest} = result;
-
-    // Derive baseUrl from source URL (remove /servers/index.json)
-    const baseUrl = source.url.replace(/\/servers\/index\.json$/, '');
-
-    // manifest is now directly an array of tool groups
-    for (const group of manifest) {
-      results.push({
-        id: group.id,
-        name: group.name,
-        version: group.version,
-        description: group.description,
-        domains: group.domains,
-        tools: group.tools,
-        sourceUrl: source.url,
-        baseUrl
-      });
-    }
-  }
-
-  return results;
+  const grouped = await searchToolsGrouped(sources, cacheMode);
+  return grouped.flatMap((source) =>
+    source.groups.flatMap((group) => group.tools)
+  );
 }
 
 export async function fetchToolSource(
   baseUrl: string,
-  groupId: string,
   toolName: string
 ): Promise<string> {
-  const fullUrl = `${baseUrl}/servers/${groupId}/tool/${toolName}.js`;
+  const fullUrl = `${baseUrl}/tools/${toolName}/source`;
   const response = await fetch(fullUrl);
   if (!response.ok) {
     throw new Error(

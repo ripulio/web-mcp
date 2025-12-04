@@ -1,4 +1,4 @@
-import type {EnabledToolGroups, StoredToolGroup} from './shared.js';
+import type {EnabledTools, StoredTool} from './shared.js';
 
 export interface ToolToInject {
   toolId: string;
@@ -54,7 +54,7 @@ let currentlyRegisteredTools = new Set<string>();
 
   // Storage changes
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledToolGroups) {
+    if (changes.enabledTools) {
       evaluateAndInjectTools();
     }
   });
@@ -62,42 +62,30 @@ let currentlyRegisteredTools = new Set<string>();
 
 async function evaluateAndInjectTools() {
   const result = await chrome.storage.local.get<{
-    enabledToolGroups: EnabledToolGroups;
-  }>(['enabledToolGroups']);
-  const enabledToolGroups = result.enabledToolGroups || {};
+    enabledTools: EnabledTools;
+  }>(['enabledTools']);
+  const enabledTools = result.enabledTools || {};
 
   const toolsToInject: ToolToInject[] = [];
   const newToolNames = new Set<string>();
 
-  for (const toolGroup of Object.values(
-    enabledToolGroups
-  ) as StoredToolGroup[]) {
-    const domainMatches = toolGroup.domains.some(
+  for (const tool of Object.values(enabledTools) as StoredTool[]) {
+    const domainMatches = tool.domains.some(
       (domain) => window.location.hostname === domain
     );
     if (!domainMatches) continue;
 
-    // Only inject tools that are in enabledToolIndices
-    // Fallback to all tools for backwards compatibility with old stored groups
-    const enabledIndices =
-      toolGroup.enabledToolIndices || toolGroup.tools.map((_, i) => i);
+    const pathMatches =
+      !tool.pathPattern ||
+      new RegExp(tool.pathPattern).test(window.location.pathname);
+    if (!pathMatches) continue;
 
-    for (const toolIndex of enabledIndices) {
-      const tool = toolGroup.tools[toolIndex];
-      if (!tool || !tool.name) continue; // Safety check
-
-      const pathMatches =
-        !tool.pathPattern ||
-        new RegExp(tool.pathPattern).test(window.location.pathname);
-      if (pathMatches) {
-        // Use groupId_toolName as stable, server-derived identifier
-        const toolId = `${toolGroup.id}_${tool.name}`;
-        if (!currentlyRegisteredTools.has(toolId)) {
-          toolsToInject.push({toolId, source: tool.source});
-        }
-        newToolNames.add(toolId);
-      }
+    // Use tool name as the identifier
+    const toolId = tool.name;
+    if (!currentlyRegisteredTools.has(toolId)) {
+      toolsToInject.push({toolId, source: tool.source});
     }
+    newToolNames.add(toolId);
   }
 
   // Unregister tools that no longer match
