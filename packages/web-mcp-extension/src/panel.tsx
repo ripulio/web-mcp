@@ -10,8 +10,8 @@ import type {
   ToolGroupResult,
   ToolRegistryResult
 } from './shared.js';
-import { DEFAULT_SETTINGS } from './shared.js';
-import { searchToolsGrouped, fetchToolSource, validateSource } from './tool-registry.js';
+import { DEFAULT_SETTINGS, LOCAL_SOURCE } from './shared.js';
+import { searchToolsGrouped, fetchToolSource, fetchLocalToolSource, validateSource } from './tool-registry.js';
 
 type GroupToggleState = 'all' | 'none' | 'partial';
 
@@ -153,11 +153,20 @@ function Panel() {
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
       const storedTools: EnabledTools = result.enabledTools || {};
 
-      setSettings(storedSettings);
+      // Ensure LOCAL_SOURCE is always present and up-to-date
+      const nonLocalSources = storedSettings.packageSources.filter(
+        (s) => s.type !== 'local' && s.url !== 'local'
+      );
+      const mergedSettings: WebMCPSettings = {
+        ...storedSettings,
+        packageSources: [LOCAL_SOURCE, ...nonLocalSources]
+      };
+
+      setSettings(mergedSettings);
       setEnabledTools(storedTools);
 
       // Then load registry with those settings
-      await loadRegistry(storedSettings.packageSources, storedSettings.cacheMode);
+      await loadRegistry(mergedSettings.packageSources, mergedSettings.cacheMode);
     })();
   }, []);
 
@@ -203,22 +212,33 @@ function Panel() {
       return rest;
     });
 
-    const result = await validateSource(url);
+    // Find the source to get its type
+    const source = settings.packageSources.find((s) => s.url === url);
+    const isLocal = source?.type === 'local' || url === 'local';
 
-    if (!result.valid) {
-      setSourceErrors((prev) => ({ ...prev, [url]: result.error! }));
-      // Remove from registry if it was previously successful
-      setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
-    } else {
-      // Reload just this source's tools
-      const results = await searchToolsGrouped([{ url }], 'none');
-      const sourceResult = results[0];
-      if (sourceResult && !sourceResult.error) {
-        setGroupedRegistry((prev) => {
-          const filtered = prev.filter((r) => r.sourceUrl !== url);
-          return [...filtered, sourceResult];
-        });
+    if (!isLocal) {
+      const result = await validateSource(url);
+      if (!result.valid) {
+        setSourceErrors((prev) => ({ ...prev, [url]: result.error! }));
+        setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+        setRefreshingSource(null);
+        return;
       }
+    }
+
+    // Reload the source's tools
+    const sourceToRefresh = isLocal ? LOCAL_SOURCE : { url };
+    const results = await searchToolsGrouped([sourceToRefresh], 'none');
+    const sourceResult = results[0];
+
+    if (sourceResult?.error) {
+      setSourceErrors((prev) => ({ ...prev, [url]: sourceResult.error! }));
+      setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+    } else if (sourceResult) {
+      setGroupedRegistry((prev) => {
+        const filtered = prev.filter((r) => r.sourceUrl !== url);
+        return [...filtered, sourceResult];
+      });
     }
 
     setRefreshingSource(null);
@@ -270,6 +290,12 @@ function Panel() {
   };
 
   const handleRemoveSource = async (url: string) => {
+    // Don't allow removing the local source
+    const source = settings.packageSources.find((s) => s.url === url);
+    if (source?.type === 'local' || url === 'local') {
+      return;
+    }
+
     // Clear any error for this source
     setSourceErrors((prev) => {
       const { [url]: _, ...rest } = prev;
@@ -307,7 +333,9 @@ function Panel() {
     });
 
     try {
-      const source = await fetchToolSource(entry.baseUrl, entry.name);
+      const source = entry.sourceUrl === 'local'
+        ? await fetchLocalToolSource(entry.name)
+        : await fetchToolSource(entry.baseUrl, entry.name);
 
       const storedTool: StoredTool = {
         name: entry.name,
@@ -356,7 +384,9 @@ function Panel() {
       const results = await Promise.allSettled(
         toolsToEnable.map(async (tool) => {
           const compositeId = `${sourceUrl}:${tool.name}`;
-          const source = await fetchToolSource(baseUrl, tool.name);
+          const source = sourceUrl === 'local'
+            ? await fetchLocalToolSource(tool.name)
+            : await fetchToolSource(baseUrl, tool.name);
           return {
             compositeId,
             storedTool: {
@@ -443,12 +473,13 @@ function Panel() {
             {settings.packageSources.map((source) => {
               const hasError = !!sourceErrors[source.url];
               const isRefreshing = refreshingSource === source.url;
+              const isLocal = source.type === 'local' || source.url === 'local';
 
               return (
                 <div key={source.url} class={`source-item ${hasError ? 'error' : ''}`}>
                   <div class="source-info">
                     {hasError && <span class="source-error-icon" title={sourceErrors[source.url]}>!</span>}
-                    <span class="source-url">{formatSourceUrl(source.url)}</span>
+                    <span class="source-url">{source.name || formatSourceUrl(source.url)}</span>
                   </div>
                   <div class="source-actions">
                     <button
@@ -459,13 +490,15 @@ function Panel() {
                     >
                       ↻
                     </button>
-                    <button
-                      class="remove-btn"
-                      onClick={() => handleRemoveSource(source.url)}
-                      title="Remove source"
-                    >
-                      ×
-                    </button>
+                    {!isLocal && (
+                      <button
+                        class="remove-btn"
+                        onClick={() => handleRemoveSource(source.url)}
+                        title="Remove source"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 </div>
               );

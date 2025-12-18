@@ -20,6 +20,44 @@ interface ToolGroupResponse {
   tools: string[];
 }
 
+async function fetchLocalManifest(): Promise<RemoteManifest> {
+  const groupsUrl = chrome.runtime.getURL('local-tools/groups.json');
+  const groupsResponse = await fetch(groupsUrl);
+  if (!groupsResponse.ok) {
+    throw new Error('Local tools not found');
+  }
+  const groupsData: ToolGroupResponse[] = await groupsResponse.json();
+
+  const allToolNames = new Set(groupsData.flatMap((g) => g.tools));
+  const toolMap = new Map<string, RemoteTool>();
+
+  await Promise.all(
+    Array.from(allToolNames).map(async (name) => {
+      const metaUrl = chrome.runtime.getURL(`local-tools/tools/${name}.json`);
+      const res = await fetch(metaUrl);
+      if (!res.ok) {
+        throw new Error(`Local tool ${name} metadata not found`);
+      }
+      toolMap.set(name, await res.json());
+    })
+  );
+
+  return groupsData.map((group) => ({
+    name: group.name,
+    description: group.description,
+    tools: group.tools.map((name) => toolMap.get(name)!)
+  }));
+}
+
+export async function fetchLocalToolSource(toolName: string): Promise<string> {
+  const url = chrome.runtime.getURL(`local-tools/tools/${toolName}.js`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Local tool source not found: ${toolName}`);
+  }
+  return response.text();
+}
+
 async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
   // Fetch groups from catalog API
   const groupsUrl = `${baseUrl.replace(/\/$/, '')}/groups`;
@@ -137,8 +175,28 @@ export async function searchToolsGrouped(
 ): Promise<GroupedToolRegistryResult[]> {
   // Fetch all manifests in parallel
   const manifestPromises = sources.map(async (source) => {
-    const baseUrl = source.url.replace(/\/$/, '');
     try {
+      if (source.type === 'local') {
+        const manifest = await fetchLocalManifest();
+        return {
+          sourceUrl: 'local',
+          baseUrl: 'local',
+          groups: manifest.map((group) => ({
+            name: group.name,
+            description: group.description,
+            tools: group.tools.map((tool) => ({
+              name: tool.name,
+              description: tool.userDescription,
+              domains: tool.domains,
+              pathPattern: tool.pathPattern,
+              sourceUrl: 'local',
+              baseUrl: 'local'
+            }))
+          }))
+        } as GroupedToolRegistryResult;
+      }
+
+      const baseUrl = source.url.replace(/\/$/, '');
       const manifest = await getManifestWithCache(source.url, cacheMode);
       return {
         sourceUrl: source.url,
@@ -158,8 +216,9 @@ export async function searchToolsGrouped(
       } as GroupedToolRegistryResult;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch';
+      const baseUrl = source.type === 'local' ? 'local' : source.url.replace(/\/$/, '');
       return {
-        sourceUrl: source.url,
+        sourceUrl: source.type === 'local' ? 'local' : source.url,
         baseUrl,
         groups: [],
         error: message

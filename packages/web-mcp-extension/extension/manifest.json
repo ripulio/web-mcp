@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WebMCP",
   "version": "1.0.0",
-  "description": "Add support for WebMCP features to your browser.",
+  "description": "Loads WebMCP functions and injects into web pages.",
   "permissions": ["activeTab", "scripting", "storage", "userScripts"],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -21,7 +21,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["user-tools-injector.js"],
+      "resources": ["user-tools-injector.js", "local-tools/*"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -20,7 +20,14 @@ export type CacheMode =
 export interface PackageSource {
   url: string;
   name?: string;
+  type?: 'remote' | 'local';
 }
+
+export const LOCAL_SOURCE: PackageSource = {
+  url: 'local',
+  name: 'Local Tools',
+  type: 'local'
+};
 
 export interface WebMCPSettings {
   cacheMode: CacheMode;
@@ -28,12 +35,12 @@ export interface WebMCPSettings {
 }
 
 export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
-  url: 'http://localhost:5176/api' // TODO: update when deployed
+  url: 'https://feature-cf-worker-preview-webmcp-catalog.james-garbutt.workers.dev/api'
 };
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
   cacheMode: {type: 'persistent', ttlMinutes: 60},
-  packageSources: [DEFAULT_PACKAGE_SOURCE]
+  packageSources: [LOCAL_SOURCE, DEFAULT_PACKAGE_SOURCE]
 };
 
 export interface RemoteTool {
