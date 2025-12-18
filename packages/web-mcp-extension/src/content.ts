@@ -1,4 +1,4 @@
-import type {EnabledTools, StoredTool} from './shared.js';
+import type {EnabledTools, StoredTool, WebMCPSettings} from './shared.js';
 
 export interface ToolToInject {
   toolId: string;
@@ -52,9 +52,9 @@ let currentlyRegisteredTools = new Set<string>();
 
   window.addEventListener('popstate', onUrlChange);
 
-  // Storage changes
+  // Storage changes - re-evaluate when tools or settings change
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledTools) {
+    if (changes.enabledTools || changes.webmcpSettings) {
       evaluateAndInjectTools();
     }
   });
@@ -63,27 +63,72 @@ let currentlyRegisteredTools = new Set<string>();
 async function evaluateAndInjectTools() {
   const result = await chrome.storage.local.get<{
     enabledTools: EnabledTools;
-  }>(['enabledTools']);
+    webmcpSettings: WebMCPSettings;
+  }>(['enabledTools', 'webmcpSettings']);
   const enabledTools = result.enabledTools || {};
+  const settings = result.webmcpSettings;
+
+  // Build set of enabled source URLs
+  const enabledSourceUrls = new Set<string>();
+  if (settings?.packageSources) {
+    for (const source of settings.packageSources) {
+      // enabled defaults to true when undefined
+      if (source.enabled !== false) {
+        const url = source.type === 'local' ? 'local' : source.url;
+        enabledSourceUrls.add(url);
+      }
+    }
+  } else {
+    // No settings yet - assume all sources enabled
+    enabledSourceUrls.add('local');
+  }
+
+  console.log(
+    `[WebMCP] Evaluating ${Object.keys(enabledTools).length} enabled tools for ${window.location.href}`
+  );
 
   const toolsToInject: ToolToInject[] = [];
   const newToolNames = new Set<string>();
 
   for (const tool of Object.values(enabledTools) as StoredTool[]) {
+    // Check if tool's source is enabled
+    if (!enabledSourceUrls.has(tool.sourceUrl)) {
+      console.log(
+        `[WebMCP] Tool "${tool.name}" skipped: source "${tool.sourceUrl}" is disabled`
+      );
+      continue;
+    }
+
     const domainMatches = tool.domains.some(
       (domain) => window.location.hostname === domain
     );
-    if (!domainMatches) continue;
+    if (!domainMatches) {
+      console.log(
+        `[WebMCP] Tool "${tool.name}" skipped: domain mismatch (expected ${tool.domains.join(', ')}, got ${window.location.hostname})`
+      );
+      continue;
+    }
 
+    // Check if any path pattern matches (empty array means match all paths)
     const pathMatches =
-      !tool.pathPattern ||
-      new RegExp(tool.pathPattern).test(window.location.pathname);
-    if (!pathMatches) continue;
+      tool.pathPatterns.length === 0 ||
+      tool.pathPatterns.some((pattern) =>
+        new RegExp(pattern).test(window.location.pathname)
+      );
+    if (!pathMatches) {
+      console.log(
+        `[WebMCP] Tool "${tool.name}" skipped: path mismatch (patterns ${tool.pathPatterns.join(', ')}, got ${window.location.pathname})`
+      );
+      continue;
+    }
 
     // Use tool name as the identifier
     const toolId = tool.name;
     if (!currentlyRegisteredTools.has(toolId)) {
+      console.log(`[WebMCP] Tool "${tool.name}" will be injected (domain and path match)`);
       toolsToInject.push({toolId, source: tool.source});
+    } else {
+      console.log(`[WebMCP] Tool "${tool.name}" already registered, skipping`);
     }
     newToolNames.add(toolId);
   }

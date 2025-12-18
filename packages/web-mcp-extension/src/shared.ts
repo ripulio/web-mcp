@@ -2,7 +2,7 @@ export interface StoredTool {
   name: string;
   description: string;
   domains: string[];
-  pathPattern?: string;
+  pathPatterns: string[]; // multiple patterns supported
   source: string; // the .js file content
   sourceUrl: string; // which manifest this came from
 }
@@ -21,6 +21,7 @@ export interface PackageSource {
   url: string;
   name?: string;
   type?: 'remote' | 'local';
+  enabled?: boolean; // defaults to true
 }
 
 export const LOCAL_SOURCE: PackageSource = {
@@ -43,11 +44,17 @@ export const DEFAULT_SETTINGS: WebMCPSettings = {
   packageSources: [LOCAL_SOURCE, DEFAULT_PACKAGE_SOURCE]
 };
 
+export interface ToolFilter {
+  type: 'domain' | 'path';
+  domains?: string[];
+  patterns?: string[];
+}
+
 export interface RemoteTool {
-  name: string;
-  userDescription: string;
-  domains: string[];
-  pathPattern?: string;
+  id: string;
+  description: string;
+  filters: ToolFilter[];
+  groupId: string;
 }
 
 export interface RemoteToolGroup {
@@ -68,9 +75,10 @@ export interface ToolRegistryResult {
   name: string;
   description: string;
   domains: string[];
-  pathPattern?: string;
+  pathPatterns: string[]; // multiple patterns supported
   sourceUrl: string;
   baseUrl: string;
+  groupName: string;
 }
 
 export interface ToolGroupResult {

@@ -17,7 +17,9 @@ type GroupToggleState = 'all' | 'none' | 'partial';
 
 function Panel() {
   const [enabledTools, setEnabledTools] = useState<EnabledTools>({});
-  const [groupedRegistry, setGroupedRegistry] = useState<GroupedToolRegistryResult[]>([]);
+  // Two-set architecture: active sources show in Available Tools, inactive are hidden
+  const [activeRegistry, setActiveRegistry] = useState<GroupedToolRegistryResult[]>([]);
+  const [inactiveRegistry, setInactiveRegistry] = useState<GroupedToolRegistryResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<WebMCPSettings>(DEFAULT_SETTINGS);
   const [newSourceUrl, setNewSourceUrl] = useState('');
@@ -55,7 +57,7 @@ function Panel() {
       }
     });
     setOverflowingDescriptions(newOverflowing);
-  }, [groupedRegistry]);
+  }, [activeRegistry]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => {
@@ -122,7 +124,7 @@ function Panel() {
       .filter((source) => source.groups.length > 0);
   };
 
-  const filteredRegistry = filterGroupedRegistry(groupedRegistry, searchQuery);
+  const filteredRegistry = filterGroupedRegistry(activeRegistry, searchQuery);
 
   const loadRegistry = async (sources: PackageSource[], cacheMode: CacheMode) => {
     setLoading(true);
@@ -137,8 +139,25 @@ function Panel() {
     }
     setSourceErrors(errors);
 
-    // Store all results (including errored ones with empty groups)
-    setGroupedRegistry(results.filter((r) => !r.error));
+    // Partition results by source enabled state
+    const successResults = results.filter((r) => !r.error);
+    const active: GroupedToolRegistryResult[] = [];
+    const inactive: GroupedToolRegistryResult[] = [];
+
+    for (const result of successResults) {
+      const source = sources.find((s) =>
+        s.type === 'local' ? result.sourceUrl === 'local' : s.url === result.sourceUrl
+      );
+      // enabled defaults to true if undefined
+      if (source?.enabled === false) {
+        inactive.push(result);
+      } else {
+        active.push(result);
+      }
+    }
+
+    setActiveRegistry(active);
+    setInactiveRegistry(inactive);
     setLoading(false);
   };
 
@@ -212,15 +231,18 @@ function Panel() {
       return rest;
     });
 
-    // Find the source to get its type
+    // Find the source to get its type and enabled state
     const source = settings.packageSources.find((s) => s.url === url);
     const isLocal = source?.type === 'local' || url === 'local';
+    const isEnabled = source?.enabled !== false;
 
     if (!isLocal) {
       const result = await validateSource(url);
       if (!result.valid) {
         setSourceErrors((prev) => ({ ...prev, [url]: result.error! }));
-        setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+        // Remove from both registries
+        setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+        setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
         setRefreshingSource(null);
         return;
       }
@@ -233,12 +255,23 @@ function Panel() {
 
     if (sourceResult?.error) {
       setSourceErrors((prev) => ({ ...prev, [url]: sourceResult.error! }));
-      setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+      setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+      setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
     } else if (sourceResult) {
-      setGroupedRegistry((prev) => {
-        const filtered = prev.filter((r) => r.sourceUrl !== url);
-        return [...filtered, sourceResult];
-      });
+      // Add to appropriate registry based on enabled state
+      if (isEnabled) {
+        setActiveRegistry((prev) => {
+          const filtered = prev.filter((r) => r.sourceUrl !== url);
+          return [...filtered, sourceResult];
+        });
+        setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+      } else {
+        setInactiveRegistry((prev) => {
+          const filtered = prev.filter((r) => r.sourceUrl !== url);
+          return [...filtered, sourceResult];
+        });
+        setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+      }
     }
 
     setRefreshingSource(null);
@@ -302,8 +335,9 @@ function Panel() {
       return rest;
     });
 
-    // Remove from registry immediately (no loading state)
-    setGroupedRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+    // Remove from both registries immediately (no loading state)
+    setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
+    setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== url));
 
     const newSettings = {
       ...settings,
@@ -311,6 +345,46 @@ function Panel() {
     };
 
     await saveSettings(newSettings);
+  };
+
+  const handleSourceToggle = async (url: string, enabled: boolean) => {
+    // Update settings
+    const newSettings = {
+      ...settings,
+      packageSources: settings.packageSources.map((s) =>
+        s.url === url ? { ...s, enabled } : s
+      )
+    };
+    await saveSettings(newSettings);
+
+    const sourceUrl = url === 'local' ? 'local' : url;
+
+    if (enabled) {
+      // Move from inactive to active
+      const sourceData = inactiveRegistry.find((r) => r.sourceUrl === sourceUrl);
+      if (sourceData) {
+        setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== sourceUrl));
+        setActiveRegistry((prev) => [...prev, sourceData]);
+      } else {
+        // No cached data - need to refetch
+        const source = newSettings.packageSources.find((s) => s.url === url);
+        const sourceToFetch = source?.type === 'local' ? LOCAL_SOURCE : { url };
+        const results = await searchToolsGrouped([sourceToFetch], 'none');
+        const sourceResult = results[0];
+        if (sourceResult && !sourceResult.error) {
+          setActiveRegistry((prev) => [...prev, sourceResult]);
+        } else if (sourceResult?.error) {
+          setSourceErrors((prev) => ({ ...prev, [sourceUrl]: sourceResult.error! }));
+        }
+      }
+    } else {
+      // Move from active to inactive
+      const sourceData = activeRegistry.find((r) => r.sourceUrl === sourceUrl);
+      if (sourceData) {
+        setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== sourceUrl));
+        setInactiveRegistry((prev) => [...prev, sourceData]);
+      }
+    }
   };
 
   const handleToolToggle = async (entry: ToolRegistryResult) => {
@@ -341,7 +415,7 @@ function Panel() {
         name: entry.name,
         description: entry.description,
         domains: entry.domains,
-        pathPattern: entry.pathPattern,
+        pathPatterns: entry.pathPatterns,
         source,
         sourceUrl: entry.sourceUrl
       };
@@ -393,7 +467,7 @@ function Panel() {
               name: tool.name,
               description: tool.description,
               domains: tool.domains,
-              pathPattern: tool.pathPattern,
+              pathPatterns: tool.pathPatterns,
               source,
               sourceUrl
             } as StoredTool
@@ -474,12 +548,24 @@ function Panel() {
               const hasError = !!sourceErrors[source.url];
               const isRefreshing = refreshingSource === source.url;
               const isLocal = source.type === 'local' || source.url === 'local';
+              const isEnabled = source.enabled !== false;
 
               return (
-                <div key={source.url} class={`source-item ${hasError ? 'error' : ''}`}>
+                <div key={source.url} class={`source-item ${hasError ? 'error' : ''} ${!isEnabled ? 'disabled' : ''}`}>
+                  <div class="source-toggle">
+                    <label class="toggle-switch source-toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => handleSourceToggle(source.url, !isEnabled)}
+                      />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
                   <div class="source-info">
                     {hasError && <span class="source-error-icon" title={sourceErrors[source.url]}>!</span>}
                     <span class="source-url">{source.name || formatSourceUrl(source.url)}</span>
+                    {hasError && <span class="source-error-message">{sourceErrors[source.url]}</span>}
                   </div>
                   <div class="source-actions">
                     <button
@@ -648,8 +734,9 @@ function Panel() {
                               <div class="registry-row">
                                 <div class="registry-info">
                                   <span class="registry-name">{entry.name}</span>
-                                  {entry.pathPattern && (
-                                    <span class="tool-path-pattern">{entry.pathPattern}</span>
+                                  <span class="tool-group-badge">{entry.groupName}</span>
+                                  {entry.pathPatterns.length > 0 && (
+                                    <span class="tool-path-pattern">{entry.pathPatterns.join(', ')}</span>
                                   )}
                                   <div class="registry-domains">
                                     {entry.domains.map((domain) => (

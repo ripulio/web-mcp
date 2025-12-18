@@ -20,11 +20,25 @@ interface ToolGroupResponse {
   tools: string[];
 }
 
+// Helper to extract domains and patterns from filters array
+function extractFilters(filters: RemoteTool['filters']): {
+  domains: string[];
+  pathPatterns: string[];
+} {
+  const domainFilter = filters.find((f) => f.type === 'domain');
+  const pathFilter = filters.find((f) => f.type === 'path');
+  return {
+    domains: domainFilter?.domains || [],
+    pathPatterns: pathFilter?.patterns || []
+  };
+}
+
 async function fetchLocalManifest(): Promise<RemoteManifest> {
   const groupsUrl = chrome.runtime.getURL('local-tools/groups.json');
   const groupsResponse = await fetch(groupsUrl);
   if (!groupsResponse.ok) {
-    throw new Error('Local tools not found');
+    // No local tools is a valid state - return empty manifest
+    return [];
   }
   const groupsData: ToolGroupResponse[] = await groupsResponse.json();
 
@@ -181,18 +195,24 @@ export async function searchToolsGrouped(
         return {
           sourceUrl: 'local',
           baseUrl: 'local',
-          groups: manifest.map((group) => ({
-            name: group.name,
-            description: group.description,
-            tools: group.tools.map((tool) => ({
-              name: tool.name,
-              description: tool.userDescription,
-              domains: tool.domains,
-              pathPattern: tool.pathPattern,
-              sourceUrl: 'local',
-              baseUrl: 'local'
-            }))
-          }))
+          groups: manifest.map((group) => {
+            return {
+              name: group.name,
+              description: group.description,
+              tools: group.tools.map((tool) => {
+                const {domains, pathPatterns} = extractFilters(tool.filters);
+                return {
+                  name: tool.id,
+                  description: tool.description,
+                  domains,
+                  pathPatterns,
+                  sourceUrl: 'local',
+                  baseUrl: 'local',
+                  groupName: group.name
+                };
+              })
+            };
+          })
         } as GroupedToolRegistryResult;
       }
 
@@ -201,18 +221,24 @@ export async function searchToolsGrouped(
       return {
         sourceUrl: source.url,
         baseUrl,
-        groups: manifest.map((group) => ({
-          name: group.name,
-          description: group.description,
-          tools: group.tools.map((tool) => ({
-            name: tool.name,
-            description: tool.userDescription,
-            domains: tool.domains,
-            pathPattern: tool.pathPattern,
-            sourceUrl: source.url,
-            baseUrl
-          }))
-        }))
+        groups: manifest.map((group) => {
+          return {
+            name: group.name,
+            description: group.description,
+            tools: group.tools.map((tool) => {
+              const {domains, pathPatterns} = extractFilters(tool.filters);
+              return {
+                name: tool.id,
+                description: tool.description,
+                domains,
+                pathPatterns,
+                sourceUrl: source.url,
+                baseUrl,
+                groupName: group.name
+              };
+            })
+          };
+        })
       } as GroupedToolRegistryResult;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch';

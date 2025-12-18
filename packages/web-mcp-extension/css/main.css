@@ -597,3 +597,52 @@ body {
   display: flex;
   align-items: center;
 }
+
+/* Source Toggle */
+.source-toggle {
+  flex-shrink: 0;
+}
+
+.source-toggle-switch {
+  width: 36px;
+  height: 20px;
+}
+
+.source-toggle-switch .toggle-slider:before {
+  height: 14px;
+  width: 14px;
+}
+
+.source-toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(16px);
+}
+
+.source-item.disabled {
+  opacity: 0.6;
+}
+
+.source-item.disabled .source-url {
+  color: #999;
+}
+
+.source-error-message {
+  font-size: 0.75rem;
+  color: #c62828;
+  margin-left: 0.5rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tool Group Badge */
+.tool-group-badge {
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  background: #f3e5f5;
+  color: #7b1fa2;
+  border-radius: 4px;
+  font-weight: 500;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
