@@ -601,6 +601,7 @@ body {
 /* Source Toggle */
 .source-toggle {
   flex-shrink: 0;
+  margin-right: 0.75rem;
 }
 
 .source-toggle-switch {
