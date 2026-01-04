@@ -114,6 +114,8 @@ function Panel() {
             isBrowsing={browsedToolsHook.isBrowsing}
             browsedTools={browsedToolsHook.browsedTools}
             browsingError={browsedToolsHook.browsingError}
+            activeRegistry={registryHook.activeRegistry}
+            inactiveRegistry={registryHook.inactiveRegistry}
             onSourceToggle={sourcesHook.handleSourceToggle}
             onRefreshSource={sourcesHook.handleRefreshSource}
             onRemoveSource={sourcesHook.handleRemoveSource}

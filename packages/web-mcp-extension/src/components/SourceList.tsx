@@ -1,4 +1,4 @@
-import type {PackageSource, BrowsedToolsData} from '../shared.js';
+import type {PackageSource, BrowsedToolsData, GroupedToolRegistryResult} from '../shared.js';
 import {formatSourceUrl} from '../utils/format.js';
 
 export interface SourceListProps {
@@ -8,6 +8,8 @@ export interface SourceListProps {
   isBrowsing: boolean;
   browsedTools: BrowsedToolsData | null;
   browsingError: string | null;
+  activeRegistry: GroupedToolRegistryResult[];
+  inactiveRegistry: GroupedToolRegistryResult[];
   onSourceToggle: (url: string, enabled: boolean) => void;
   onRefreshSource: (url: string) => void;
   onRemoveSource: (url: string) => void;
@@ -23,6 +25,8 @@ export function SourceList({
   isBrowsing,
   browsedTools,
   browsingError,
+  activeRegistry,
+  inactiveRegistry,
   onSourceToggle,
   onRefreshSource,
   onRemoveSource,
@@ -30,6 +34,13 @@ export function SourceList({
   onRefreshBrowsedTools,
   onClearBrowsedTools
 }: SourceListProps) {
+  const getSourceGroupCount = (sourceUrl: string): number | null => {
+    const entry =
+      activeRegistry.find((r) => r.sourceUrl === sourceUrl) ||
+      inactiveRegistry.find((r) => r.sourceUrl === sourceUrl);
+    return entry?.groups?.length ?? null;
+  };
+
   return (
     <div class="source-list">
       {sources.map((source) => {
@@ -90,14 +101,6 @@ export function SourceList({
                     {isBrowsing ? '...' : 'Browse'}
                   </button>
                   {browsedTools && (
-                    <span
-                      class="browsed-info"
-                      title={`${browsedTools.directoryName} - Last updated: ${new Date(browsedTools.lastUpdated).toLocaleString()}`}
-                    >
-                      {browsedTools.groups.length} groups
-                    </span>
-                  )}
-                  {browsedTools && (
                     <button
                       class="clear-browsed-btn"
                       onClick={onClearBrowsedTools}
@@ -108,6 +111,21 @@ export function SourceList({
                   )}
                 </>
               )}
+              {(() => {
+                const groupCount =
+                  isLocal && browsedTools
+                    ? browsedTools.groups.length
+                    : getSourceGroupCount(source.url);
+                const tooltip =
+                  isLocal && browsedTools
+                    ? `${browsedTools.directoryName} - Last updated: ${new Date(browsedTools.lastUpdated).toLocaleString()}`
+                    : undefined;
+                return groupCount != null && groupCount > 0 ? (
+                  <span class="browsed-info" title={tooltip}>
+                    {groupCount} groups
+                  </span>
+                ) : null;
+              })()}
               <button
                 class={`source-refresh-btn ${isRefreshing ? 'spinning' : ''}`}
                 onClick={() =>
