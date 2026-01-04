@@ -54,7 +54,7 @@ let currentlyRegisteredTools = new Set<string>();
 
   // Storage changes - re-evaluate when tools or settings change
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledTools || changes.webmcpSettings) {
+    if (changes.enabledToolGroups || changes.webmcpSettings) {
       evaluateAndInjectTools();
     }
   });
@@ -62,10 +62,10 @@ let currentlyRegisteredTools = new Set<string>();
 
 async function evaluateAndInjectTools() {
   const result = await chrome.storage.local.get<{
-    enabledTools: EnabledTools;
+    enabledToolGroups: EnabledTools;
     webmcpSettings: WebMCPSettings;
-  }>(['enabledTools', 'webmcpSettings']);
-  const enabledTools = result.enabledTools || {};
+  }>(['enabledToolGroups', 'webmcpSettings']);
+  const enabledTools = result.enabledToolGroups || {};
   const settings = result.webmcpSettings;
 
   // Build set of enabled source URLs

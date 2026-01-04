@@ -165,12 +165,12 @@ function Panel() {
     (async () => {
       // Load settings first
       const result = await chrome.storage.local.get<{
-        enabledTools: EnabledTools;
+        enabledToolGroups: EnabledTools;
         webmcpSettings: WebMCPSettings;
-      }>(['enabledTools', 'webmcpSettings']);
+      }>(['enabledToolGroups', 'webmcpSettings']);
 
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
-      const storedTools: EnabledTools = result.enabledTools || {};
+      const storedTools: EnabledTools = result.enabledToolGroups || {};
 
       // Ensure LOCAL_SOURCE is always present and up-to-date
       const nonLocalSources = storedSettings.packageSources.filter(
@@ -395,7 +395,7 @@ function Panel() {
       // Disable - remove from storage
       const { [compositeId]: _, ...rest } = enabledTools;
       setEnabledTools(rest);
-      await chrome.storage.local.set({ enabledTools: rest });
+      await chrome.storage.local.set({ enabledToolGroups: rest });
       return;
     }
 
@@ -422,7 +422,7 @@ function Panel() {
 
       const updatedTools = { ...enabledTools, [compositeId]: storedTool };
       setEnabledTools(updatedTools);
-      await chrome.storage.local.set({ enabledTools: updatedTools });
+      await chrome.storage.local.set({ enabledToolGroups: updatedTools });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch tool';
       setFetchErrors((prev) => ({ ...prev, [compositeId]: message }));
@@ -490,7 +490,7 @@ function Panel() {
       }
 
       setEnabledTools(updatedTools);
-      await chrome.storage.local.set({ enabledTools: updatedTools });
+      await chrome.storage.local.set({ enabledToolGroups: updatedTools });
       setFetchErrors((prev) => ({ ...prev, ...newErrors }));
       setFetchingIds((prev) => {
         const next = new Set(prev);
@@ -505,7 +505,7 @@ function Panel() {
         delete updatedTools[compositeId];
       }
       setEnabledTools(updatedTools);
-      await chrome.storage.local.set({ enabledTools: updatedTools });
+      await chrome.storage.local.set({ enabledToolGroups: updatedTools });
     }
   };
 
