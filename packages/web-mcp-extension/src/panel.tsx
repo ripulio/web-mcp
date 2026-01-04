@@ -1,5 +1,20 @@
 import { render } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
+
+// File System Access API types
+declare global {
+  interface Window {
+    showDirectoryPicker(options?: {
+      mode?: 'read' | 'readwrite';
+      startIn?: 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos';
+    }): Promise<FileSystemDirectoryHandle>;
+  }
+  interface FileSystemHandle {
+    queryPermission(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
+    requestPermission(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
+  }
+}
+
 import type {
   EnabledTools,
   StoredTool,
@@ -8,10 +23,12 @@ import type {
   WebMCPSettings,
   GroupedToolRegistryResult,
   ToolGroupResult,
-  ToolRegistryResult
+  ToolRegistryResult,
+  BrowsedToolsData
 } from './shared.js';
 import { DEFAULT_SETTINGS, LOCAL_SOURCE } from './shared.js';
 import { searchToolsGrouped, fetchToolSource, fetchLocalToolSource, validateSource } from './tool-registry.js';
+import { parseToolDirectory } from './directory-parser.js';
 
 type GroupToggleState = 'all' | 'none' | 'partial';
 
@@ -35,6 +52,11 @@ function Panel() {
   const [refreshingSource, setRefreshingSource] = useState<string | null>(null);
   const [addingSource, setAddingSource] = useState(false);
   const [addSourceError, setAddSourceError] = useState<string | null>(null);
+  // Browsed tools state
+  const [browsedTools, setBrowsedTools] = useState<BrowsedToolsData | null>(null);
+  const [browsingError, setBrowsingError] = useState<string | null>(null);
+  const [isBrowsing, setIsBrowsing] = useState(false);
+  const [cachedDirHandle, setCachedDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
 
   const toggleDescription = (key: string) => {
     setExpandedDescriptions((prev) => {
@@ -167,10 +189,16 @@ function Panel() {
       const result = await chrome.storage.local.get<{
         enabledToolGroups: EnabledTools;
         webmcpSettings: WebMCPSettings;
-      }>(['enabledToolGroups', 'webmcpSettings']);
+        browsedTools: BrowsedToolsData;
+      }>(['enabledToolGroups', 'webmcpSettings', 'browsedTools']);
 
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
       const storedTools: EnabledTools = result.enabledToolGroups || {};
+
+      // Load browsed tools if present
+      if (result.browsedTools) {
+        setBrowsedTools(result.browsedTools);
+      }
 
       // Ensure LOCAL_SOURCE is always present and up-to-date
       const nonLocalSources = storedSettings.packageSources.filter(
@@ -345,6 +373,97 @@ function Panel() {
     };
 
     await saveSettings(newSettings);
+  };
+
+  /**
+   * Verify we have read permission on a directory handle, requesting if needed
+   */
+  const verifyPermission = async (handle: FileSystemDirectoryHandle): Promise<boolean> => {
+    const opts = { mode: 'read' as const };
+
+    // Check if we already have permission
+    if ((await handle.queryPermission(opts)) === 'granted') {
+      return true;
+    }
+
+    // Request permission
+    if ((await handle.requestPermission(opts)) === 'granted') {
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleBrowseDirectory = async () => {
+    setIsBrowsing(true);
+    setBrowsingError(null);
+
+    try {
+      // Use File System Access API for native folder picker
+      const dirHandle = await window.showDirectoryPicker({
+        mode: 'read'
+      });
+
+      // Cache the handle for refresh
+      setCachedDirHandle(dirHandle);
+
+      const result = await parseToolDirectory(dirHandle);
+      await chrome.storage.local.set({ browsedTools: result });
+      setBrowsedTools(result);
+      // Refresh the registry to pick up new tools
+      await loadRegistry(settings.packageSources, 'none');
+    } catch (error) {
+      // User cancelled = AbortError, don't show as error
+      if (error instanceof Error && error.name === 'AbortError') {
+        // User cancelled, do nothing
+      } else {
+        setBrowsingError(error instanceof Error ? error.message : 'Failed to parse directory');
+      }
+    } finally {
+      setIsBrowsing(false);
+    }
+  };
+
+  /**
+   * Refresh browsed tools using cached directory handle (no picker needed)
+   */
+  const handleRefreshBrowsedTools = async () => {
+    if (!cachedDirHandle) {
+      // No cached handle, fall back to browse
+      return handleBrowseDirectory();
+    }
+
+    setIsBrowsing(true);
+    setBrowsingError(null);
+
+    try {
+      // Verify we still have permission
+      const hasPermission = await verifyPermission(cachedDirHandle);
+      if (!hasPermission) {
+        // Permission denied, need to re-pick
+        setCachedDirHandle(null);
+        return handleBrowseDirectory();
+      }
+
+      // Reuse cached handle
+      const result = await parseToolDirectory(cachedDirHandle);
+      await chrome.storage.local.set({ browsedTools: result });
+      setBrowsedTools(result);
+      await loadRegistry(settings.packageSources, 'none');
+    } catch (error) {
+      setBrowsingError(error instanceof Error ? error.message : 'Failed to refresh');
+    } finally {
+      setIsBrowsing(false);
+    }
+  };
+
+  const handleClearBrowsedTools = async () => {
+    await chrome.storage.local.remove(['browsedTools']);
+    setBrowsedTools(null);
+    setBrowsingError(null);
+    setCachedDirHandle(null);
+    // Refresh to fall back to bundled local-tools
+    await loadRegistry(settings.packageSources, 'none');
   };
 
   const handleSourceToggle = async (url: string, enabled: boolean) => {
@@ -564,15 +683,49 @@ function Panel() {
                   </div>
                   <div class="source-info">
                     {hasError && <span class="source-error-icon" title={sourceErrors[source.url]}>!</span>}
-                    <span class="source-url">{source.name || formatSourceUrl(source.url)}</span>
+                    <span
+                      class="source-url"
+                      title={isLocal ? "Browse to select a local webmcp-tools repo (must be built with 'npm run build')" : undefined}
+                    >
+                      {source.name || formatSourceUrl(source.url)}
+                    </span>
                     {hasError && <span class="source-error-message">{sourceErrors[source.url]}</span>}
                   </div>
                   <div class="source-actions">
+                    {isLocal && (
+                      <>
+                        <button
+                          class="browse-btn"
+                          onClick={handleBrowseDirectory}
+                          disabled={isBrowsing}
+                          title="Browse for tools directory"
+                        >
+                          {isBrowsing ? '...' : 'Browse'}
+                        </button>
+                        {browsedTools && (
+                          <span
+                            class="browsed-info"
+                            title={`${browsedTools.directoryName} - Last updated: ${new Date(browsedTools.lastUpdated).toLocaleString()}`}
+                          >
+                            {browsedTools.groups.length} groups
+                          </span>
+                        )}
+                        {browsedTools && (
+                          <button
+                            class="clear-browsed-btn"
+                            onClick={handleClearBrowsedTools}
+                            title="Clear browsed tools"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </>
+                    )}
                     <button
                       class={`source-refresh-btn ${isRefreshing ? 'spinning' : ''}`}
-                      onClick={() => handleRefreshSource(source.url)}
-                      disabled={isRefreshing}
-                      title="Refresh source"
+                      onClick={() => isLocal && browsedTools ? handleRefreshBrowsedTools() : handleRefreshSource(source.url)}
+                      disabled={isRefreshing || isBrowsing}
+                      title={isLocal && browsedTools ? "Refresh tools from directory" : "Refresh source"}
                     >
                       ↻
                     </button>
@@ -586,6 +739,9 @@ function Panel() {
                       </button>
                     )}
                   </div>
+                  {isLocal && browsingError && (
+                    <div class="browsing-error">{browsingError}</div>
+                  )}
                 </div>
               );
             })}

@@ -646,3 +646,54 @@ body {
   margin-left: 0.5rem;
   vertical-align: middle;
 }
+
+/* Browse Button for Local Tools */
+.browse-btn {
+  padding: 0.25rem 0.5rem;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.browse-btn:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.browse-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.browsed-info {
+  font-size: 0.6875rem;
+  color: #666;
+  background: #e8f5e9;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.clear-browsed-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.125rem;
+  line-height: 1;
+}
+
+.clear-browsed-btn:hover {
+  color: #e53935;
+}
+
+.browsing-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 4px;
+  color: #c62828;
+  font-size: 0.75rem;
+}

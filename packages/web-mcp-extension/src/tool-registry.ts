@@ -6,7 +6,8 @@ import type {
   ManifestCache,
   ManifestCacheEntry,
   ToolRegistryResult,
-  GroupedToolRegistryResult
+  GroupedToolRegistryResult,
+  BrowsedToolsData
 } from './shared.js';
 
 export type {ToolRegistryResult, GroupedToolRegistryResult};
@@ -33,7 +34,35 @@ function extractFilters(filters: RemoteTool['filters']): {
   };
 }
 
+/**
+ * Convert BrowsedToolsData to RemoteManifest format
+ */
+function convertBrowsedToManifest(browsedTools: BrowsedToolsData): RemoteManifest {
+  return browsedTools.groups.map((group) => ({
+    name: group.name,
+    description: group.description,
+    tools: group.tools
+      .map((toolId) => browsedTools.tools.find((t) => t.id === toolId))
+      .filter((t): t is NonNullable<typeof t> => t !== undefined)
+      .map((tool) => ({
+        id: tool.id,
+        description: tool.description,
+        filters: tool.filters,
+        groupId: tool.groupId
+      }))
+  }));
+}
+
 async function fetchLocalManifest(): Promise<RemoteManifest> {
+  // Check for browsed tools first
+  const stored = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>([
+    'browsedTools'
+  ]);
+  if (stored.browsedTools) {
+    return convertBrowsedToManifest(stored.browsedTools);
+  }
+
+  // Fall back to bundled local-tools
   const groupsUrl = chrome.runtime.getURL('local-tools/groups.json');
   const groupsResponse = await fetch(groupsUrl);
   if (!groupsResponse.ok) {
@@ -64,6 +93,19 @@ async function fetchLocalManifest(): Promise<RemoteManifest> {
 }
 
 export async function fetchLocalToolSource(toolName: string): Promise<string> {
+  // Check for browsed tools first
+  const stored = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>([
+    'browsedTools'
+  ]);
+  if (stored.browsedTools) {
+    const tool = stored.browsedTools.tools.find((t) => t.id === toolName);
+    if (tool) {
+      return tool.source;
+    }
+    throw new Error(`Browsed tool source not found: ${toolName}`);
+  }
+
+  // Fall back to bundled local-tools
   const url = chrome.runtime.getURL(`local-tools/tools/${toolName}.js`);
   const response = await fetch(url);
   if (!response.ok) {
