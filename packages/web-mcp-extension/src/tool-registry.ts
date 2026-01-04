@@ -1,13 +1,24 @@
+export interface DomainFilter {
+  type: 'domain';
+  domains: string[];
+}
+
+export interface PathFilter {
+  type: 'path';
+  patterns: string[];
+}
+
+export type ToolFilter = DomainFilter | PathFilter;
+
 export interface ToolSource {
   source: string;
-  pathPattern?: string;
+  filters?: ToolFilter[];
 }
 
 export interface ToolRegistryResult {
   id: string;
   name: string;
   description: string;
-  domains: string[];
   tools: ToolSource[];
 }
 

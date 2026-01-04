@@ -1,5 +1,6 @@
 import 'webmcp-polyfill';
 import type {EnabledToolGroups} from './shared.js';
+import type {DomainFilter, PathFilter} from './tool-registry.js';
 
 const registeredTools = new Set<string>();
 
@@ -18,17 +19,30 @@ function updateTools(
   const toolsToRegister = new Set<string>();
 
   for (const toolGroup of Object.values(enabledToolGroups)) {
-    const domainMatches = toolGroup.domains.some(
-      (domain) => currentDomain === domain
-    );
-
-    if (!domainMatches) {
-      continue;
-    }
-
     for (const tool of toolGroup.tools) {
+      // Check domain filters
+      const domainFilters = tool.filters?.filter(
+        (f): f is DomainFilter => f.type === 'domain'
+      );
+      const domainMatches =
+        !domainFilters?.length ||
+        domainFilters.some((f) =>
+          f.domains.some((d) => currentDomain === d)
+        );
+
+      if (!domainMatches) {
+        continue;
+      }
+
+      // Check path filters
+      const pathFilters = tool.filters?.filter(
+        (f): f is PathFilter => f.type === 'path'
+      );
       const pathMatches =
-        !tool.pathPattern || new RegExp(tool.pathPattern).test(currentPath);
+        !pathFilters?.length ||
+        pathFilters.some((f) =>
+          f.patterns.some((p) => new RegExp(p).test(currentPath))
+        );
 
       if (!pathMatches) {
         continue;
