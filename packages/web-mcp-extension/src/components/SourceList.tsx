@@ -16,6 +16,9 @@ export interface SourceListProps {
   onBrowseDirectory: () => void;
   onRefreshBrowsedTools: () => void;
   onClearBrowsedTools: () => void;
+  pollingEnabled: boolean;
+  pollingError: string | null;
+  onPollingToggle: (enabled: boolean) => void;
 }
 
 export function SourceList({
@@ -32,7 +35,10 @@ export function SourceList({
   onRemoveSource,
   onBrowseDirectory,
   onRefreshBrowsedTools,
-  onClearBrowsedTools
+  onClearBrowsedTools,
+  pollingEnabled,
+  pollingError,
+  onPollingToggle
 }: SourceListProps) {
   const getSourceGroupCount = (sourceUrl: string): number | null => {
     const entry =
@@ -100,6 +106,25 @@ export function SourceList({
                   >
                     {isBrowsing ? '...' : 'Browse'}
                   </button>
+                  <label
+                    class="toggle-switch poll-toggle"
+                    title="Watch for changes: Automatically reload tools when files change"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pollingEnabled}
+                      onChange={(e) =>
+                        onPollingToggle(e.currentTarget.checked)
+                      }
+                      disabled={isBrowsing}
+                    />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  {pollingError && (
+                    <span class="poll-warning" title={pollingError}>
+                      ⚠
+                    </span>
+                  )}
                   {browsedTools && (
                     <button
                       class="clear-browsed-btn"

@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'preact/hooks';
 import type {BrowsedToolsData} from '../shared.js';
 import {parseToolDirectory} from '../directory-parser.js';
+import {useDirectoryPolling} from './useDirectoryPolling.js';
 
 // File System Access API types
 declare global {
@@ -37,6 +38,9 @@ export interface UseBrowsedToolsReturn {
   handleBrowseDirectory: () => Promise<void>;
   handleRefreshBrowsedTools: () => Promise<void>;
   handleClearBrowsedTools: () => Promise<void>;
+  pollingEnabled: boolean;
+  pollingError: string | null;
+  handlePollingToggle: (enabled: boolean) => Promise<void>;
 }
 
 /**
@@ -72,6 +76,17 @@ export function useBrowsedTools(
   const [isBrowsing, setIsBrowsing] = useState(false);
   const [cachedDirHandle, setCachedDirHandle] =
     useState<FileSystemDirectoryHandle | null>(null);
+
+  // Directory polling hook
+  const polling = useDirectoryPolling({
+    dirHandle: cachedDirHandle,
+    currentData: browsedTools,
+    onUpdate: async (result) => {
+      await chrome.storage.local.set({browsedTools: result});
+      setBrowsedTools(result);
+      await onRefresh();
+    }
+  });
 
   useEffect(() => {
     (async () => {
@@ -163,6 +178,9 @@ export function useBrowsedTools(
     isBrowsing,
     handleBrowseDirectory,
     handleRefreshBrowsedTools,
-    handleClearBrowsedTools
+    handleClearBrowsedTools,
+    pollingEnabled: polling.enabled,
+    pollingError: polling.error,
+    handlePollingToggle: polling.setEnabled
   };
 }

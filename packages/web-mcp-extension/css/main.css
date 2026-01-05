@@ -135,6 +135,34 @@ body {
   background-color: #90CAF9;
 }
 
+/* Poll toggle - green color */
+.poll-toggle {
+  width: 32px;
+  height: 18px;
+  margin-left: 0.5rem;
+}
+
+.poll-toggle .toggle-slider:before {
+  height: 12px;
+  width: 12px;
+}
+
+.poll-toggle input:checked + .toggle-slider {
+  background-color: #4CAF50;
+}
+
+.poll-toggle input:checked + .toggle-slider:before {
+  transform: translateX(14px);
+}
+
+/* Poll warning icon */
+.poll-warning {
+  color: #f57c00;
+  font-size: 0.875rem;
+  margin-left: 0.25rem;
+  cursor: help;
+}
+
 /* Settings Sections */
 .settings-section {
   margin-bottom: 2rem;

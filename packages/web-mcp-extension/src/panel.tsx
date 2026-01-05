@@ -122,6 +122,9 @@ function Panel() {
             onBrowseDirectory={browsedToolsHook.handleBrowseDirectory}
             onRefreshBrowsedTools={browsedToolsHook.handleRefreshBrowsedTools}
             onClearBrowsedTools={browsedToolsHook.handleClearBrowsedTools}
+            pollingEnabled={browsedToolsHook.pollingEnabled}
+            pollingError={browsedToolsHook.pollingError}
+            onPollingToggle={browsedToolsHook.handlePollingToggle}
           />
           <AddSourceForm
             newSourceUrl={sourcesHook.newSourceUrl}

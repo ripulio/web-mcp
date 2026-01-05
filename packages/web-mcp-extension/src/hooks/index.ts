@@ -10,6 +10,12 @@ export type {UseEnabledToolsReturn, GroupToggleState} from './useEnabledTools.js
 export {useBrowsedTools} from './useBrowsedTools.js';
 export type {UseBrowsedToolsReturn, UseBrowsedToolsOptions} from './useBrowsedTools.js';
 
+export {useDirectoryPolling} from './useDirectoryPolling.js';
+export type {
+  UseDirectoryPollingReturn,
+  UseDirectoryPollingOptions
+} from './useDirectoryPolling.js';
+
 export {useSources} from './useSources.js';
 export type {UseSourcesReturn, UseSourcesOptions} from './useSources.js';
 
