@@ -120,3 +120,21 @@ export interface BrowsedToolsData {
   groups: BrowsedToolGroup[];
   tools: BrowsedTool[];
 }
+
+// Types for tool invocation tracking in popup
+export interface ToolInvocation {
+  id: string;
+  toolName: string;
+  args: unknown;
+  result: unknown | null; // null while pending
+  startedAt: number;
+  completedAt: number | null;
+  isError: boolean;
+}
+
+export interface TabToolState {
+  tabId: number;
+  url: string;
+  injectedTools: string[];
+  invocations: ToolInvocation[];
+}

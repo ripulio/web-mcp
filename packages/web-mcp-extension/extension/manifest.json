@@ -6,7 +6,8 @@
   "permissions": ["activeTab", "scripting", "storage", "userScripts"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "WebMCP Settings"
+    "default_title": "WebMCP",
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js"

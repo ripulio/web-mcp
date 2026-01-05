@@ -38,6 +38,14 @@ async function build() {
     });
     console.log('✓ Built panel.js');
 
+    // Build popup (invocation tracking)
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(srcDir, 'popup.tsx')],
+      outfile: join(extensionDir, 'popup.js')
+    });
+    console.log('✓ Built popup.js');
+
     // Build background service worker
     await esbuild.build({
       ...commonConfig,
@@ -61,6 +69,14 @@ async function build() {
       outfile: join(extensionDir, 'main.css')
     });
     console.log('✓ Built main.css');
+
+    // Build popup styles
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(cssDir, 'popup.css')],
+      outfile: join(extensionDir, 'popup.css')
+    });
+    console.log('✓ Built popup.css');
 
     console.log('\nBuild complete! Extension ready in ./extension/');
   } catch (error) {

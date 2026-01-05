@@ -19,6 +19,18 @@ let currentlyRegisteredTools = new Set<string>();
     window.addEventListener('message', listener);
   });
 
+  // Listen for tool invocation events from MAIN world and relay to background
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== window) return;
+    const {type} = event.data;
+    if (
+      type === 'WEBMCP_TOOL_INVOCATION_START' ||
+      type === 'WEBMCP_TOOL_INVOCATION_END'
+    ) {
+      chrome.runtime.sendMessage(event.data);
+    }
+  });
+
   // Inject polyfill first
   await chrome.runtime.sendMessage({type: 'WEBMCP_INJECT_SCRIPT'});
   await injectorReady;
