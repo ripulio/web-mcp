@@ -8,12 +8,14 @@ export interface UseSettingsReturn {
   cacheMode: CacheMode;
   isPersistent: boolean;
   cacheTTL: number;
+  browserControlEnabled: boolean;
   saveSettings: (newSettings: WebMCPSettings) => Promise<void>;
   handleCacheModeChange: (
     mode: 'none' | 'session' | 'manual' | 'persistent',
     onModeChange?: (newCacheMode: CacheMode) => void
   ) => Promise<void>;
   handleTTLChange: (ttl: number) => Promise<void>;
+  handleBrowserControlToggle: (enabled: boolean) => Promise<void>;
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -77,14 +79,29 @@ export function useSettings(): UseSettingsReturn {
     await saveSettings(newSettings);
   };
 
+  const browserControlEnabled = settings.browserControlEnabled ?? false;
+
+  const handleBrowserControlToggle = async (enabled: boolean) => {
+    const newSettings = {...settings, browserControlEnabled: enabled};
+    await saveSettings(newSettings);
+
+    // Notify background script of the change
+    chrome.runtime.sendMessage({
+      type: 'BROWSER_CONTROL_TOGGLE',
+      enabled
+    });
+  };
+
   return {
     settings,
     loading,
     cacheMode,
     isPersistent,
     cacheTTL,
+    browserControlEnabled,
     saveSettings,
     handleCacheModeChange,
-    handleTTLChange
+    handleTTLChange,
+    handleBrowserControlToggle
   };
 }

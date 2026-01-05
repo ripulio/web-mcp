@@ -15,3 +15,6 @@ export type {SourceListProps} from './SourceList.js';
 
 export {ToolsSection} from './ToolsSection.js';
 export type {ToolsSectionProps} from './ToolsSection.js';
+
+export {BrowserControlSection} from './BrowserControlSection.js';
+export type {BrowserControlSectionProps} from './BrowserControlSection.js';

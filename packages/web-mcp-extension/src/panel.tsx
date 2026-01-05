@@ -8,14 +8,16 @@ import {
   useBrowsedTools,
   useSources,
   useToolSearch,
-  useExpandableUI
+  useExpandableUI,
+  useBrowserControlStatus
 } from './hooks/index.js';
 
 import {
   SourceList,
   AddSourceForm,
   CacheModeSection,
-  ToolsSection
+  ToolsSection,
+  BrowserControlSection
 } from './components/index.js';
 
 function Panel() {
@@ -51,6 +53,7 @@ function Panel() {
 
   const searchHook = useToolSearch();
   const expandableHook = useExpandableUI(registryHook.activeRegistry);
+  const browserControlStatus = useBrowserControlStatus();
 
   // Initial load - coordinate settings and registry
   useEffect(() => {
@@ -143,6 +146,13 @@ function Panel() {
           isPersistent={settingsHook.isPersistent}
           onCacheModeChange={handleCacheModeChange}
           onTTLChange={settingsHook.handleTTLChange}
+        />
+
+        {/* Browser Control MCP Server Section */}
+        <BrowserControlSection
+          enabled={settingsHook.browserControlEnabled}
+          connectedPorts={browserControlStatus.status.connectedPorts}
+          onToggle={settingsHook.handleBrowserControlToggle}
         />
 
         {/* Tools Section */}

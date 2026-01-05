@@ -726,3 +726,68 @@ body {
   color: #c62828;
   font-size: 0.75rem;
 }
+
+/* Browser Control MCP Server Section */
+.browser-control-setup {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  border-radius: 6px;
+}
+
+.setup-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.setup-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.75rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.setup-steps li {
+  margin-bottom: 0.25rem;
+}
+
+.setup-steps code {
+  background: #fff;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.6875rem;
+  color: #1b5e20;
+  border: 1px solid #a5d6a7;
+}
+
+.browser-control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.browser-control-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  margin-left: 0.5rem;
+}
+
+.browser-control-status {
+  font-size: 0.75rem;
+  color: #4caf50;
+  margin-left: auto;
+}
+
+.browser-control-status.scanning {
+  color: #ff9800;
+}

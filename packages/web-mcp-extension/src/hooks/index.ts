@@ -24,3 +24,6 @@ export type {UseToolSearchReturn} from './useToolSearch.js';
 
 export {useExpandableUI} from './useExpandableUI.js';
 export type {UseExpandableUIReturn, DescriptionRefsType} from './useExpandableUI.js';
+
+export {useBrowserControlStatus} from './useBrowserControlStatus.js';
+export type {UseBrowserControlStatusReturn} from './useBrowserControlStatus.js';
