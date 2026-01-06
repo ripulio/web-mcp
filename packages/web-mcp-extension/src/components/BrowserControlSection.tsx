@@ -20,8 +20,11 @@ export function BrowserControlSection({
         <p class="setup-title">Setup with Claude Code:</p>
         <ol class="setup-steps">
           <li>
-            Run <code>/plugin marketplace add ripulio/browser-mcp</code> then{' '}
-            <code>/plugin install browser-mcp</code> in Claude Code
+            In Claude Code, run:
+            <br />
+            <code>/plugin marketplace add ripulio/browser-mcp</code>
+            <br />
+            <code>/plugin install browser-mcp</code>
           </li>
           <li>Enable the toggle below</li>
           <li>
