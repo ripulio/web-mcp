@@ -447,6 +447,7 @@ async function handleOpenTab(
       }
     });
   } else {
+    const tools = await discoverPageTools(tab.id!);
     sendToPort(sourcePort, {
       type: ExtensionMessageType.TAB_CREATED,
       sessionId,
@@ -454,7 +455,7 @@ async function handleOpenTab(
         id: tab.id!,
         title: tab.title || '',
         url: tab.url || url,
-        tools: []
+        tools
       },
       requestId
     });
