@@ -3,9 +3,10 @@ import type {
   EnabledTools,
   StoredTool,
   ToolRegistryResult,
-  ToolGroupResult
+  ToolGroupResult,
+  SourceCache
 } from '../shared.js';
-import {fetchToolSource, fetchLocalToolSource} from '../tool-registry.js';
+import {fetchToolSource} from '../tool-registry.js';
 
 export type GroupToggleState = 'all' | 'none' | 'partial';
 
@@ -66,42 +67,59 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       return;
     }
 
-    // Enable - fetch tool source
-    setFetchingIds((prev) => new Set(prev).add(compositeId));
-    setFetchErrors((prev) => {
-      const {[compositeId]: _, ...rest} = prev;
-      return rest;
-    });
+    // Enable - store reference (source looked up at injection time)
+    const isLocal = entry.sourceUrl === 'local';
 
-    try {
-      const source =
-        entry.sourceUrl === 'local'
-          ? await fetchLocalToolSource(entry.name)
-          : await fetchToolSource(entry.baseUrl, entry.name);
-
-      const newStoredTool: StoredTool = {
-        name: entry.name,
-        description: entry.description,
-        domains: entry.domains,
-        pathPatterns: entry.pathPatterns,
-        source,
-        sourceUrl: entry.sourceUrl
-      };
-
-      const updatedTools = {...enabledTools, [compositeId]: newStoredTool};
-      setEnabledTools(updatedTools);
-      await chrome.storage.local.set({enabledToolGroups: updatedTools});
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to fetch tool';
-      setFetchErrors((prev) => ({...prev, [compositeId]: message}));
-    } finally {
-      setFetchingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(compositeId);
-        return next;
+    if (!isLocal) {
+      // Remote tools: fetch source and store in sourceCache
+      setFetchingIds((prev) => new Set(prev).add(compositeId));
+      setFetchErrors((prev) => {
+        const {[compositeId]: _, ...rest} = prev;
+        return rest;
       });
+
+      try {
+        const source = await fetchToolSource(entry.baseUrl, entry.name);
+
+        // Store source in sourceCache
+        const cacheResult = await chrome.storage.local.get<{sourceCache: SourceCache}>(['sourceCache']);
+        const sourceCache = cacheResult.sourceCache || {};
+        if (!sourceCache[entry.sourceUrl]) {
+          sourceCache[entry.sourceUrl] = {};
+        }
+        sourceCache[entry.sourceUrl][entry.name] = source;
+        await chrome.storage.local.set({sourceCache});
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to fetch tool';
+        setFetchErrors((prev) => ({...prev, [compositeId]: message}));
+        setFetchingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(compositeId);
+          return next;
+        });
+        return; // Don't enable if source fetch failed
+      } finally {
+        setFetchingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(compositeId);
+          return next;
+        });
+      }
     }
+
+    // Store reference in enabledToolGroups (no source field)
+    const newStoredTool: StoredTool = {
+      name: entry.name,
+      description: entry.description,
+      domains: entry.domains,
+      pathPatterns: entry.pathPatterns,
+      sourceUrl: entry.sourceUrl
+    };
+
+    const updatedTools = {...enabledTools, [compositeId]: newStoredTool};
+    setEnabledTools(updatedTools);
+    await chrome.storage.local.set({enabledToolGroups: updatedTools});
   };
 
   const handleGroupToggle = async (
@@ -111,6 +129,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
   ) => {
     const currentState = getGroupToggleState(group, sourceUrl);
     const shouldEnable = currentState !== 'all';
+    const isLocal = sourceUrl === 'local';
 
     if (shouldEnable) {
       // Enable all tools that aren't already enabled
@@ -119,59 +138,77 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         return !enabledTools[compositeId];
       });
 
-      // Mark all as fetching
       const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
-      setFetchingIds((prev) => {
-        const next = new Set(prev);
-        ids.forEach((id) => next.add(id));
-        return next;
-      });
+      const updatedTools = {...enabledTools};
+      const newErrors: {[id: string]: string} = {};
 
-      // Fetch all in parallel
-      const results = await Promise.allSettled(
-        toolsToEnable.map(async (tool) => {
+      if (isLocal) {
+        // Local tools: just store refs, source is in browsedTools
+        for (const tool of toolsToEnable) {
           const compositeId = `${sourceUrl}:${tool.name}`;
-          const source =
-            sourceUrl === 'local'
-              ? await fetchLocalToolSource(tool.name)
-              : await fetchToolSource(baseUrl, tool.name);
-          return {
-            compositeId,
-            storedTool: {
+          updatedTools[compositeId] = {
+            name: tool.name,
+            description: tool.description,
+            domains: tool.domains,
+            pathPatterns: tool.pathPatterns,
+            sourceUrl
+          };
+        }
+      } else {
+        // Remote tools: fetch sources and store in sourceCache
+        setFetchingIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.add(id));
+          return next;
+        });
+
+        const results = await Promise.allSettled(
+          toolsToEnable.map(async (tool) => {
+            const source = await fetchToolSource(baseUrl, tool.name);
+            return {toolName: tool.name, source};
+          })
+        );
+
+        // Update sourceCache with fetched sources
+        const cacheResult = await chrome.storage.local.get<{sourceCache: SourceCache}>(['sourceCache']);
+        const sourceCache = cacheResult.sourceCache || {};
+        if (!sourceCache[sourceUrl]) {
+          sourceCache[sourceUrl] = {};
+        }
+
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
+          const tool = toolsToEnable[i];
+          const compositeId = `${sourceUrl}:${tool.name}`;
+
+          if (result.status === 'fulfilled') {
+            sourceCache[sourceUrl][tool.name] = result.value.source;
+            updatedTools[compositeId] = {
               name: tool.name,
               description: tool.description,
               domains: tool.domains,
               pathPatterns: tool.pathPatterns,
-              source,
               sourceUrl
-            } as StoredTool
-          };
-        })
-      );
-
-      // Process results
-      const updatedTools = {...enabledTools};
-      const newErrors: {[id: string]: string} = {};
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        const compositeId = `${sourceUrl}:${toolsToEnable[i].name}`;
-        if (result.status === 'fulfilled') {
-          updatedTools[result.value.compositeId] = result.value.storedTool;
-        } else {
-          newErrors[compositeId] =
-            result.reason?.message || 'Failed to fetch tool';
+            };
+          } else {
+            newErrors[compositeId] =
+              result.reason?.message || 'Failed to fetch tool';
+          }
         }
+
+        await chrome.storage.local.set({sourceCache});
+        setFetchingIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.delete(id));
+          return next;
+        });
       }
 
       setEnabledTools(updatedTools);
       await chrome.storage.local.set({enabledToolGroups: updatedTools});
-      setFetchErrors((prev) => ({...prev, ...newErrors}));
-      setFetchingIds((prev) => {
-        const next = new Set(prev);
-        ids.forEach((id) => next.delete(id));
-        return next;
-      });
+      if (Object.keys(newErrors).length > 0) {
+        setFetchErrors((prev) => ({...prev, ...newErrors}));
+      }
     } else {
       // Disable all tools in group
       const updatedTools = {...enabledTools};

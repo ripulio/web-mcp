@@ -98,13 +98,6 @@ function Panel() {
     <div class="panel">
       <div class="panel-header">
         <h1 class="panel-title">WebMCP Settings</h1>
-        <button
-          class="refresh-btn"
-          onClick={sourcesHook.handleRefresh}
-          disabled={registryHook.loading}
-        >
-          {registryHook.loading ? 'Refreshing...' : 'Refresh'}
-        </button>
       </div>
       <div class="panel-content">
         {/* Package Sources Section */}

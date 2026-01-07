@@ -64,8 +64,6 @@ export function useDirectoryPolling(
         const permission = await dirHandle.queryPermission({mode: 'read'});
         if (permission !== 'granted') {
           setError('Permission revoked');
-          setEnabledState(false);
-          await chrome.storage.local.set({pollingEnabled: false});
           return;
         }
 
@@ -76,8 +74,6 @@ export function useDirectoryPolling(
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Polling failed');
-        setEnabledState(false);
-        await chrome.storage.local.set({pollingEnabled: false});
       }
     };
 

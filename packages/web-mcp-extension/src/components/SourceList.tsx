@@ -99,32 +99,19 @@ export function SourceList({
               {isLocal && (
                 <>
                   <button
-                    class="browse-btn"
-                    onClick={onBrowseDirectory}
-                    disabled={isBrowsing}
-                    title="Browse for tools directory"
-                  >
-                    {isBrowsing ? '...' : 'Browse'}
-                  </button>
-                  <label
-                    class="toggle-switch poll-toggle"
-                    title="Watch for changes: Automatically reload tools when files change"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={pollingEnabled}
-                      onChange={(e) =>
-                        onPollingToggle(e.currentTarget.checked)
+                    class={`auto-update-text${pollingEnabled && pollingError ? ' error' : ''}`}
+                    onClick={() => {
+                      if (pollingEnabled && pollingError) {
+                        onBrowseDirectory();
+                      } else {
+                        onPollingToggle(!pollingEnabled);
                       }
-                      disabled={isBrowsing}
-                    />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  {pollingError && (
-                    <span class="poll-warning" title={pollingError}>
-                      ⚠
-                    </span>
-                  )}
+                    }}
+                    disabled={isBrowsing}
+                    title={pollingEnabled && pollingError ? "Click to provide access" : "Watch for changes: Automatically reload tools when files change"}
+                  >
+                    auto update: {pollingEnabled ? (pollingError ? 'off ⚠️' : 'on') : 'off'}
+                  </button>
                   {browsedTools && (
                     <button
                       class="clear-browsed-btn"

@@ -3,8 +3,15 @@ export interface StoredTool {
   description: string;
   domains: string[];
   pathPatterns: string[]; // multiple patterns supported
-  source: string; // the .js file content
+  source?: string; // DEPRECATED - source now looked up from browsedTools or sourceCache
   sourceUrl: string; // which manifest this came from
+}
+
+// Cache of tool sources per source URL (for remote tools)
+export interface SourceCache {
+  [sourceUrl: string]: {
+    [toolName: string]: string;
+  };
 }
 
 export interface EnabledTools {
@@ -27,7 +34,8 @@ export interface PackageSource {
 export const LOCAL_SOURCE: PackageSource = {
   url: 'local',
   name: 'Local Tools',
-  type: 'local'
+  type: 'local',
+  enabled: false
 };
 
 export interface WebMCPSettings {

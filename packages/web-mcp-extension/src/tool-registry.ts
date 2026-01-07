@@ -332,3 +332,39 @@ export async function fetchToolSource(
   }
   return response.text();
 }
+
+/**
+ * Refresh source cache for all enabled tools from a remote source.
+ * Re-fetches tool sources and updates sourceCache storage.
+ */
+export async function refreshSourceCache(
+  sourceUrl: string,
+  baseUrl: string,
+  enabledToolNames: string[]
+): Promise<void> {
+  if (enabledToolNames.length === 0) return;
+
+  // Fetch all sources in parallel
+  const results = await Promise.allSettled(
+    enabledToolNames.map(async (toolName) => {
+      const source = await fetchToolSource(baseUrl, toolName);
+      return {toolName, source};
+    })
+  );
+
+  // Update sourceCache
+  const cacheResult = await chrome.storage.local.get<{sourceCache: import('./shared.js').SourceCache}>(['sourceCache']);
+  const sourceCache = cacheResult.sourceCache || {};
+  if (!sourceCache[sourceUrl]) {
+    sourceCache[sourceUrl] = {};
+  }
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      sourceCache[sourceUrl][result.value.toolName] = result.value.source;
+    }
+    // Silently skip failed fetches - tool will use stale source
+  }
+
+  await chrome.storage.local.set({sourceCache});
+}

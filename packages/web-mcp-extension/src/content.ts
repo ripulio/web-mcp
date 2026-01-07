@@ -1,4 +1,4 @@
-import type {EnabledTools, StoredTool, WebMCPSettings} from './shared.js';
+import type {EnabledTools, StoredTool, WebMCPSettings, BrowsedToolsData, SourceCache} from './shared.js';
 
 export interface ToolToInject {
   toolId: string;
@@ -68,9 +68,9 @@ let currentlyRegisteredTools = new Set<string>();
 
   window.addEventListener('popstate', onUrlChange);
 
-  // Storage changes - re-evaluate when tools or settings change
+  // Storage changes - re-evaluate when tools, settings, or sources change
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledToolGroups || changes.webmcpSettings) {
+    if (changes.enabledToolGroups || changes.webmcpSettings || changes.browsedTools || changes.sourceCache) {
       evaluateAndInjectTools();
     }
   });
@@ -80,9 +80,13 @@ async function evaluateAndInjectTools() {
   const result = await chrome.storage.local.get<{
     enabledToolGroups: EnabledTools;
     webmcpSettings: WebMCPSettings;
-  }>(['enabledToolGroups', 'webmcpSettings']);
+    browsedTools: BrowsedToolsData;
+    sourceCache: SourceCache;
+  }>(['enabledToolGroups', 'webmcpSettings', 'browsedTools', 'sourceCache']);
   const enabledTools = result.enabledToolGroups || {};
   const settings = result.webmcpSettings;
+  const browsedTools = result.browsedTools;
+  const sourceCache = result.sourceCache || {};
 
   // Build set of enabled source URLs
   const enabledSourceUrls = new Set<string>();
@@ -138,11 +142,28 @@ async function evaluateAndInjectTools() {
       continue;
     }
 
+    // Look up source from appropriate storage
+    let source: string | undefined;
+    if (tool.sourceUrl === 'local') {
+      source = browsedTools?.tools.find(t => t.id === tool.name)?.source;
+    } else {
+      source = sourceCache[tool.sourceUrl]?.[tool.name];
+    }
+    // Fallback to legacy tool.source for backward compatibility
+    if (!source && tool.source) {
+      source = tool.source;
+    }
+
+    if (!source) {
+      console.log(`[WebMCP] Tool "${tool.name}" skipped: source not found`);
+      continue;
+    }
+
     // Use tool name as the identifier
     const toolId = tool.name;
     if (!currentlyRegisteredTools.has(toolId)) {
       console.log(`[WebMCP] Tool "${tool.name}" will be injected (domain and path match)`);
-      toolsToInject.push({toolId, source: tool.source});
+      toolsToInject.push({toolId, source});
     } else {
       console.log(`[WebMCP] Tool "${tool.name}" already registered, skipping`);
     }

@@ -4,10 +4,11 @@ import type {
   PackageSource,
   CacheMode,
   GroupedToolRegistryResult,
-  BrowsedToolsData
+  BrowsedToolsData,
+  EnabledTools
 } from '../shared.js';
 import {LOCAL_SOURCE} from '../shared.js';
-import {searchToolsGrouped, validateSource} from '../tool-registry.js';
+import {searchToolsGrouped, validateSource, refreshSourceCache} from '../tool-registry.js';
 
 export interface UseSourcesOptions {
   settings: WebMCPSettings;
@@ -40,7 +41,6 @@ export interface UseSourcesReturn {
   handleRemoveSource: (url: string) => Promise<void>;
   handleSourceToggle: (url: string, enabled: boolean) => Promise<void>;
   handleRefreshSource: (url: string) => Promise<void>;
-  handleRefresh: () => Promise<void>;
 }
 
 export function useSources(options: UseSourcesOptions): UseSourcesReturn {
@@ -67,10 +67,6 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
 
   const clearAddSourceError = () => setAddSourceError(null);
 
-  const handleRefresh = async () => {
-    await loadRegistry(settings.packageSources, 'none');
-  };
-
   const handleRefreshSource = async (url: string) => {
     setRefreshingSource(url);
 
@@ -96,6 +92,18 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
         removeFromRegistries(url);
         setRefreshingSource(null);
         return;
+      }
+
+      // Refresh source cache for enabled tools from this source
+      const storageResult = await chrome.storage.local.get<{enabledToolGroups: EnabledTools}>(['enabledToolGroups']);
+      const enabledTools = storageResult.enabledToolGroups || {};
+      const enabledToolNames = Object.values(enabledTools)
+        .filter(tool => tool.sourceUrl === url)
+        .map(tool => tool.name);
+
+      if (enabledToolNames.length > 0) {
+        const baseUrl = url.replace(/\/$/, '');
+        await refreshSourceCache(url, baseUrl, enabledToolNames);
       }
     }
 
@@ -230,7 +238,6 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     handleAddSource,
     handleRemoveSource,
     handleSourceToggle,
-    handleRefreshSource,
-    handleRefresh
+    handleRefreshSource
   };
 }
