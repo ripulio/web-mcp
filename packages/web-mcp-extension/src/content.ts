@@ -35,8 +35,12 @@ let currentlyRegisteredTools = new Set<string>();
   await chrome.runtime.sendMessage({type: 'WEBMCP_INJECT_SCRIPT'});
   await injectorReady;
 
-  // Initial evaluation
-  await evaluateAndInjectTools();
+  // Initial evaluation - always signal ready, even on error
+  try {
+    await evaluateAndInjectTools();
+  } finally {
+    chrome.runtime.sendMessage({type: 'WEBMCP_TOOLS_READY'});
+  }
 
   // SPA navigation detection
   let lastUrl = window.location.href;

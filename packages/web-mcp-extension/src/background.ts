@@ -267,9 +267,11 @@ function connectToPort(port: number): void {
   };
 
   ws.onclose = () => {
-    console.log(`${BC_LOG_PREFIX} Disconnected from server on port ${port}`);
-    wsConnections.delete(port);
-    broadcastStatusUpdate();
+    if (wsConnections.has(port)) {
+      console.log(`${BC_LOG_PREFIX} Disconnected from server on port ${port}`);
+      wsConnections.delete(port);
+      broadcastStatusUpdate();
+    }
   };
 
   ws.onerror = () => {
@@ -438,23 +440,45 @@ async function handleOpenTab(
   sessionId?: string
 ): Promise<void> {
   const tab = await chrome.tabs.create({url, active: focus});
+  if (!tab.id) return;
 
-  if (focus && tab.id) {
-    chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
-      if (tabId === tab.id && changeInfo.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        sendTabFocused(sourcePort, tab.id!, requestId, sessionId);
-      }
+  const isRestricted =
+    !url ||
+    url.startsWith('chrome://') ||
+    url.startsWith('chrome-extension://') ||
+    url.startsWith('about:') ||
+    url.startsWith('edge://') ||
+    url.startsWith('devtools://');
+
+  if (!isRestricted) {
+    // Wait for tools ready signal - temporary listener, no persistent state
+    await new Promise<void>((resolve) => {
+      const listener = (
+        message: {type?: string},
+        sender: chrome.runtime.MessageSender
+      ) => {
+        if (message.type === 'WEBMCP_TOOLS_READY' && sender.tab?.id === tab.id) {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve();
+        }
+      };
+      chrome.runtime.onMessage.addListener(listener);
     });
+  }
+
+  const tools = await discoverPageTools(tab.id);
+  const tabInfo = await chrome.tabs.get(tab.id);
+
+  if (focus) {
+    sendTabFocused(sourcePort, tab.id, requestId, sessionId);
   } else {
-    const tools = await discoverPageTools(tab.id!);
     sendToPort(sourcePort, {
       type: ExtensionMessageType.TAB_CREATED,
       sessionId,
       tab: {
-        id: tab.id!,
-        title: tab.title || '',
-        url: tab.url || url,
+        id: tab.id,
+        title: tabInfo.title || '',
+        url: tabInfo.url || url,
         tools
       },
       requestId
