@@ -1,18 +1,26 @@
+// Reference to an enabled tool - just identifies which tool is enabled
 export interface StoredTool {
   name: string;
-  description: string;
-  domains: string[];
-  pathPatterns: string[]; // multiple patterns supported
-  source?: string; // DEPRECATED - source now looked up from browsedTools or sourceCache
-  sourceUrl: string; // which manifest this came from
+  sourceUrl: string; // 'local' or remote source URL
 }
 
-// Cache of tool sources per source URL (for remote tools)
-export interface SourceCache {
+// Full tool data cached for injection (both local and remote tools)
+export interface CachedToolData {
+  source: string;
+  domains: string[];
+  pathPatterns: string[];
+  description: string;
+}
+
+// Unified cache for ALL enabled tools (local and remote)
+export interface ToolCache {
   [sourceUrl: string]: {
-    [toolName: string]: string;
+    [toolName: string]: CachedToolData;
   };
 }
+
+// Legacy alias for migration - content.ts falls back to this
+export type SourceCache = ToolCache;
 
 export interface EnabledTools {
   [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`

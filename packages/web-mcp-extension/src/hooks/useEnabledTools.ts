@@ -4,9 +4,24 @@ import type {
   StoredTool,
   ToolRegistryResult,
   ToolGroupResult,
-  SourceCache
+  ToolCache,
+  CachedToolData,
+  BrowsedToolsData
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
+
+// Helper to extract domains and pathPatterns from browsedTools filters
+function extractFilters(filters: {type: string; domains?: string[]; patterns?: string[]}[]): {
+  domains: string[];
+  pathPatterns: string[];
+} {
+  const domainFilter = filters.find((f) => f.type === 'domain');
+  const pathFilter = filters.find((f) => f.type === 'path');
+  return {
+    domains: domainFilter?.domains || [],
+    pathPatterns: pathFilter?.patterns || []
+  };
+}
 
 export type GroupToggleState = 'all' | 'none' | 'partial';
 
@@ -67,53 +82,72 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       return;
     }
 
-    // Enable - store reference (source looked up at injection time)
+    // Enable - get tool data and store in unified toolCache
     const isLocal = entry.sourceUrl === 'local';
 
-    if (!isLocal) {
-      // Remote tools: fetch source and store in sourceCache
-      setFetchingIds((prev) => new Set(prev).add(compositeId));
-      setFetchErrors((prev) => {
-        const {[compositeId]: _, ...rest} = prev;
-        return rest;
-      });
+    setFetchingIds((prev) => new Set(prev).add(compositeId));
+    setFetchErrors((prev) => {
+      const {[compositeId]: _, ...rest} = prev;
+      return rest;
+    });
 
-      try {
-        const source = await fetchToolSource(entry.baseUrl, entry.name);
+    try {
+      let toolData: CachedToolData;
 
-        // Store source in sourceCache
-        const cacheResult = await chrome.storage.local.get<{sourceCache: SourceCache}>(['sourceCache']);
-        const sourceCache = cacheResult.sourceCache || {};
-        if (!sourceCache[entry.sourceUrl]) {
-          sourceCache[entry.sourceUrl] = {};
+      if (isLocal) {
+        // Local tools: get data from browsedTools
+        const browsedResult = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>(['browsedTools']);
+        const browsedTool = browsedResult.browsedTools?.tools.find(t => t.id === entry.name);
+        if (!browsedTool) {
+          throw new Error('Tool not found in browsed tools');
         }
-        sourceCache[entry.sourceUrl][entry.name] = source;
-        await chrome.storage.local.set({sourceCache});
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to fetch tool';
-        setFetchErrors((prev) => ({...prev, [compositeId]: message}));
-        setFetchingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(compositeId);
-          return next;
-        });
-        return; // Don't enable if source fetch failed
-      } finally {
-        setFetchingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(compositeId);
-          return next;
-        });
+        const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+        toolData = {
+          source: browsedTool.source,
+          domains,
+          pathPatterns,
+          description: browsedTool.description
+        };
+      } else {
+        // Remote tools: fetch source from server
+        const source = await fetchToolSource(entry.baseUrl, entry.name);
+        toolData = {
+          source,
+          domains: entry.domains,
+          pathPatterns: entry.pathPatterns,
+          description: entry.description
+        };
       }
+
+      // Store in unified toolCache
+      const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache}>(['toolCache']);
+      const toolCache = cacheResult.toolCache || {};
+      if (!toolCache[entry.sourceUrl]) {
+        toolCache[entry.sourceUrl] = {};
+      }
+      toolCache[entry.sourceUrl][entry.name] = toolData;
+      await chrome.storage.local.set({toolCache});
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to fetch tool';
+      setFetchErrors((prev) => ({...prev, [compositeId]: message}));
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(compositeId);
+        return next;
+      });
+      return; // Don't enable if failed
+    } finally {
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(compositeId);
+        return next;
+      });
     }
 
-    // Store reference in enabledToolGroups (no source field)
+    // Store only reference in enabledToolGroups
     const newStoredTool: StoredTool = {
       name: entry.name,
-      description: entry.description,
-      domains: entry.domains,
-      pathPatterns: entry.pathPatterns,
       sourceUrl: entry.sourceUrl
     };
 
@@ -142,39 +176,49 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       const updatedTools = {...enabledTools};
       const newErrors: {[id: string]: string} = {};
 
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
+
+      // Get tool data and store in unified toolCache
+      const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache; browsedTools: BrowsedToolsData}>(['toolCache', 'browsedTools']);
+      const toolCache = cacheResult.toolCache || {};
+      if (!toolCache[sourceUrl]) {
+        toolCache[sourceUrl] = {};
+      }
+
       if (isLocal) {
-        // Local tools: just store refs, source is in browsedTools
+        // Local tools: get data from browsedTools
+        const browsedTools = cacheResult.browsedTools;
         for (const tool of toolsToEnable) {
           const compositeId = `${sourceUrl}:${tool.name}`;
-          updatedTools[compositeId] = {
-            name: tool.name,
-            description: tool.description,
-            domains: tool.domains,
-            pathPatterns: tool.pathPatterns,
-            sourceUrl
-          };
+          const browsedTool = browsedTools?.tools.find(t => t.id === tool.name);
+          if (browsedTool) {
+            const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+            toolCache[sourceUrl][tool.name] = {
+              source: browsedTool.source,
+              domains,
+              pathPatterns,
+              description: browsedTool.description
+            };
+            updatedTools[compositeId] = {
+              name: tool.name,
+              sourceUrl
+            };
+          } else {
+            newErrors[compositeId] = 'Tool not found in browsed tools';
+          }
         }
       } else {
-        // Remote tools: fetch sources and store in sourceCache
-        setFetchingIds((prev) => {
-          const next = new Set(prev);
-          ids.forEach((id) => next.add(id));
-          return next;
-        });
-
+        // Remote tools: fetch sources from server
         const results = await Promise.allSettled(
           toolsToEnable.map(async (tool) => {
             const source = await fetchToolSource(baseUrl, tool.name);
-            return {toolName: tool.name, source};
+            return {tool, source};
           })
         );
-
-        // Update sourceCache with fetched sources
-        const cacheResult = await chrome.storage.local.get<{sourceCache: SourceCache}>(['sourceCache']);
-        const sourceCache = cacheResult.sourceCache || {};
-        if (!sourceCache[sourceUrl]) {
-          sourceCache[sourceUrl] = {};
-        }
 
         for (let i = 0; i < results.length; i++) {
           const result = results[i];
@@ -182,12 +226,14 @@ export function useEnabledTools(): UseEnabledToolsReturn {
           const compositeId = `${sourceUrl}:${tool.name}`;
 
           if (result.status === 'fulfilled') {
-            sourceCache[sourceUrl][tool.name] = result.value.source;
-            updatedTools[compositeId] = {
-              name: tool.name,
-              description: tool.description,
+            toolCache[sourceUrl][tool.name] = {
+              source: result.value.source,
               domains: tool.domains,
               pathPatterns: tool.pathPatterns,
+              description: tool.description
+            };
+            updatedTools[compositeId] = {
+              name: tool.name,
               sourceUrl
             };
           } else {
@@ -195,14 +241,14 @@ export function useEnabledTools(): UseEnabledToolsReturn {
               result.reason?.message || 'Failed to fetch tool';
           }
         }
-
-        await chrome.storage.local.set({sourceCache});
-        setFetchingIds((prev) => {
-          const next = new Set(prev);
-          ids.forEach((id) => next.delete(id));
-          return next;
-        });
       }
+
+      await chrome.storage.local.set({toolCache});
+      setFetchingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
 
       setEnabledTools(updatedTools);
       await chrome.storage.local.set({enabledToolGroups: updatedTools});

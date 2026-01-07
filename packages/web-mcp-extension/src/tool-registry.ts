@@ -334,37 +334,46 @@ export async function fetchToolSource(
 }
 
 /**
- * Refresh source cache for all enabled tools from a remote source.
- * Re-fetches tool sources and updates sourceCache storage.
+ * Refresh tool cache for enabled tools from a remote source.
+ * Re-fetches tool sources and updates toolCache storage with full tool data.
+ * @param sourceUrl - The source URL (used as key in toolCache)
+ * @param baseUrl - The base URL for fetching tool sources
+ * @param toolsToRefresh - Array of tools with their metadata from the refreshed manifest
  */
-export async function refreshSourceCache(
+export async function refreshToolCache(
   sourceUrl: string,
   baseUrl: string,
-  enabledToolNames: string[]
+  toolsToRefresh: Array<{name: string; domains: string[]; pathPatterns: string[]; description: string}>
 ): Promise<void> {
-  if (enabledToolNames.length === 0) return;
+  if (toolsToRefresh.length === 0) return;
 
   // Fetch all sources in parallel
   const results = await Promise.allSettled(
-    enabledToolNames.map(async (toolName) => {
-      const source = await fetchToolSource(baseUrl, toolName);
-      return {toolName, source};
+    toolsToRefresh.map(async (tool) => {
+      const source = await fetchToolSource(baseUrl, tool.name);
+      return {tool, source};
     })
   );
 
-  // Update sourceCache
-  const cacheResult = await chrome.storage.local.get<{sourceCache: import('./shared.js').SourceCache}>(['sourceCache']);
-  const sourceCache = cacheResult.sourceCache || {};
-  if (!sourceCache[sourceUrl]) {
-    sourceCache[sourceUrl] = {};
+  // Update toolCache with full tool data
+  const cacheResult = await chrome.storage.local.get<{toolCache: import('./shared.js').ToolCache}>(['toolCache']);
+  const toolCache = cacheResult.toolCache || {};
+  if (!toolCache[sourceUrl]) {
+    toolCache[sourceUrl] = {};
   }
 
   for (const result of results) {
     if (result.status === 'fulfilled') {
-      sourceCache[sourceUrl][result.value.toolName] = result.value.source;
+      const {tool, source} = result.value;
+      toolCache[sourceUrl][tool.name] = {
+        source,
+        domains: tool.domains,
+        pathPatterns: tool.pathPatterns,
+        description: tool.description
+      };
     }
-    // Silently skip failed fetches - tool will use stale source
+    // Silently skip failed fetches - tool will use stale data
   }
 
-  await chrome.storage.local.set({sourceCache});
+  await chrome.storage.local.set({toolCache});
 }

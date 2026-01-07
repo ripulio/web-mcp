@@ -1,4 +1,24 @@
-import type {EnabledTools, StoredTool, WebMCPSettings, BrowsedToolsData, SourceCache} from './shared.js';
+import type {EnabledTools, StoredTool, WebMCPSettings, ToolCache, BrowsedToolsData, BrowsedTool} from './shared.js';
+
+// Extract domains and pathPatterns from filters array (for legacy browsedTools fallback)
+function extractFilters(filters: BrowsedTool['filters']): {
+  domains: string[];
+  pathPatterns: string[];
+} {
+  const domainFilter = filters.find((f) => f.type === 'domain');
+  const pathFilter = filters.find((f) => f.type === 'path');
+  return {
+    domains: domainFilter?.domains || [],
+    pathPatterns: pathFilter?.patterns || []
+  };
+}
+
+// Resolved tool data for injection
+interface ResolvedToolData {
+  source: string;
+  domains: string[];
+  pathPatterns: string[];
+}
 
 export interface ToolToInject {
   toolId: string;
@@ -68,9 +88,9 @@ let currentlyRegisteredTools = new Set<string>();
 
   window.addEventListener('popstate', onUrlChange);
 
-  // Storage changes - re-evaluate when tools, settings, or sources change
+  // Storage changes - re-evaluate when tools, settings, or cache change
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledToolGroups || changes.webmcpSettings || changes.browsedTools || changes.sourceCache) {
+    if (changes.enabledToolGroups || changes.webmcpSettings || changes.toolCache) {
       evaluateAndInjectTools();
     }
   });
@@ -80,13 +100,17 @@ async function evaluateAndInjectTools() {
   const result = await chrome.storage.local.get<{
     enabledToolGroups: EnabledTools;
     webmcpSettings: WebMCPSettings;
+    toolCache: ToolCache;
+    // Legacy fallback storage (for migration)
+    sourceCache: ToolCache;
     browsedTools: BrowsedToolsData;
-    sourceCache: SourceCache;
-  }>(['enabledToolGroups', 'webmcpSettings', 'browsedTools', 'sourceCache']);
+  }>(['enabledToolGroups', 'webmcpSettings', 'toolCache', 'sourceCache', 'browsedTools']);
   const enabledTools = result.enabledToolGroups || {};
   const settings = result.webmcpSettings;
-  const browsedTools = result.browsedTools;
-  const sourceCache = result.sourceCache || {};
+  const toolCache = result.toolCache || {};
+  // Legacy storage for fallback during migration
+  const legacySourceCache = result.sourceCache || {};
+  const legacyBrowsedTools = result.browsedTools;
 
   // Build set of enabled source URLs
   const enabledSourceUrls = new Set<string>();
@@ -110,62 +134,87 @@ async function evaluateAndInjectTools() {
   const toolsToInject: ToolToInject[] = [];
   const newToolNames = new Set<string>();
 
-  for (const tool of Object.values(enabledTools) as StoredTool[]) {
+  for (const toolRef of Object.values(enabledTools) as StoredTool[]) {
     // Check if tool's source is enabled
-    if (!enabledSourceUrls.has(tool.sourceUrl)) {
+    if (!enabledSourceUrls.has(toolRef.sourceUrl)) {
       console.log(
-        `[WebMCP] Tool "${tool.name}" skipped: source "${tool.sourceUrl}" is disabled`
+        `[WebMCP] Tool "${toolRef.name}" skipped: source "${toolRef.sourceUrl}" is disabled`
       );
       continue;
     }
 
-    const domainMatches = tool.domains.some(
+    // Look up tool data from unified toolCache
+    let toolData: ResolvedToolData | null = null;
+    const cached = toolCache[toolRef.sourceUrl]?.[toolRef.name];
+
+    if (cached) {
+      // Found in unified cache
+      toolData = {
+        source: cached.source,
+        domains: cached.domains,
+        pathPatterns: cached.pathPatterns
+      };
+    } else {
+      // Fallback to legacy storage for migration
+      if (toolRef.sourceUrl === 'local') {
+        // Legacy local tools: look up from browsedTools
+        const browsedTool = legacyBrowsedTools?.tools.find(t => t.id === toolRef.name);
+        if (browsedTool) {
+          const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+          toolData = {
+            source: browsedTool.source,
+            domains,
+            pathPatterns
+          };
+        }
+      } else {
+        // Legacy remote tools: look up from sourceCache
+        const legacyCached = legacySourceCache[toolRef.sourceUrl]?.[toolRef.name];
+        if (legacyCached) {
+          toolData = {
+            source: legacyCached.source,
+            domains: legacyCached.domains,
+            pathPatterns: legacyCached.pathPatterns
+          };
+        }
+      }
+    }
+
+    if (!toolData) {
+      console.log(`[WebMCP] Tool "${toolRef.name}" skipped: tool data not found in source storage`);
+      continue;
+    }
+
+    const domainMatches = toolData.domains.some(
       (domain) => window.location.hostname === domain
     );
     if (!domainMatches) {
       console.log(
-        `[WebMCP] Tool "${tool.name}" skipped: domain mismatch (expected ${tool.domains.join(', ')}, got ${window.location.hostname})`
+        `[WebMCP] Tool "${toolRef.name}" skipped: domain mismatch (expected ${toolData.domains.join(', ')}, got ${window.location.hostname})`
       );
       continue;
     }
 
     // Check if any path pattern matches (empty array means match all paths)
     const pathMatches =
-      tool.pathPatterns.length === 0 ||
-      tool.pathPatterns.some((pattern) =>
+      toolData.pathPatterns.length === 0 ||
+      toolData.pathPatterns.some((pattern) =>
         new RegExp(pattern).test(window.location.pathname)
       );
     if (!pathMatches) {
       console.log(
-        `[WebMCP] Tool "${tool.name}" skipped: path mismatch (patterns ${tool.pathPatterns.join(', ')}, got ${window.location.pathname})`
+        `[WebMCP] Tool "${toolRef.name}" skipped: path mismatch (patterns ${toolData.pathPatterns.join(', ')}, got ${window.location.pathname})`
       );
       continue;
     }
 
-    // Look up source from appropriate storage
-    let source: string | undefined;
-    if (tool.sourceUrl === 'local') {
-      source = browsedTools?.tools.find(t => t.id === tool.name)?.source;
-    } else {
-      source = sourceCache[tool.sourceUrl]?.[tool.name];
-    }
-    // Fallback to legacy tool.source for backward compatibility
-    if (!source && tool.source) {
-      source = tool.source;
-    }
-
-    if (!source) {
-      console.log(`[WebMCP] Tool "${tool.name}" skipped: source not found`);
-      continue;
-    }
-
     // Use tool name as the identifier
-    const toolId = tool.name;
+    const toolId = toolRef.name;
     if (!currentlyRegisteredTools.has(toolId)) {
-      console.log(`[WebMCP] Tool "${tool.name}" will be injected (domain and path match)`);
-      toolsToInject.push({toolId, source});
+      console.log(`[WebMCP] Tool "${toolRef.name}" will be injected (domain and path match)`);
+      toolsToInject.push({toolId, source: toolData.source});
     } else {
-      console.log(`[WebMCP] Tool "${tool.name}" already registered, skipping`);
+      console.log(`[WebMCP] Tool "${toolRef.name}" already registered, skipping`);
     }
     newToolNames.add(toolId);
   }

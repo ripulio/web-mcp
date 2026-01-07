@@ -1,7 +1,65 @@
 import {useState, useEffect} from 'preact/hooks';
-import type {BrowsedToolsData} from '../shared.js';
+import type {BrowsedToolsData, EnabledTools, ToolCache, CachedToolData} from '../shared.js';
 import {parseToolDirectory} from '../directory-parser.js';
 import {useDirectoryPolling} from './useDirectoryPolling.js';
+
+// Helper to extract domains and pathPatterns from filters
+function extractFilters(filters: {type: string; domains?: string[]; patterns?: string[]}[]): {
+  domains: string[];
+  pathPatterns: string[];
+} {
+  const domainFilter = filters.find((f) => f.type === 'domain');
+  const pathFilter = filters.find((f) => f.type === 'path');
+  return {
+    domains: domainFilter?.domains || [],
+    pathPatterns: pathFilter?.patterns || []
+  };
+}
+
+/**
+ * Sync enabled local tools from browsedTools to toolCache.
+ * This ensures toolCache always has the latest source/metadata after updates.
+ */
+async function syncLocalToolsToCache(browsedTools: BrowsedToolsData): Promise<void> {
+  const result = await chrome.storage.local.get<{
+    enabledToolGroups: EnabledTools;
+    toolCache: ToolCache;
+  }>(['enabledToolGroups', 'toolCache']);
+
+  const enabledTools = result.enabledToolGroups || {};
+  const toolCache = result.toolCache || {};
+
+  // Find enabled local tools
+  const enabledLocalToolNames = Object.values(enabledTools)
+    .filter(t => t.sourceUrl === 'local')
+    .map(t => t.name);
+
+  if (enabledLocalToolNames.length === 0) {
+    return; // No local tools enabled, nothing to sync
+  }
+
+  // Ensure local entry exists in toolCache
+  if (!toolCache['local']) {
+    toolCache['local'] = {};
+  }
+
+  // Sync each enabled local tool
+  for (const toolName of enabledLocalToolNames) {
+    const browsedTool = browsedTools.tools.find(t => t.id === toolName);
+    if (browsedTool) {
+      const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+      const toolData: CachedToolData = {
+        source: browsedTool.source,
+        domains,
+        pathPatterns,
+        description: browsedTool.description
+      };
+      toolCache['local'][toolName] = toolData;
+    }
+  }
+
+  await chrome.storage.local.set({toolCache});
+}
 
 // File System Access API types
 declare global {
@@ -84,6 +142,8 @@ export function useBrowsedTools(
     onUpdate: async (result) => {
       await chrome.storage.local.set({browsedTools: result});
       setBrowsedTools(result);
+      // Sync enabled local tools to unified toolCache
+      await syncLocalToolsToCache(result);
       await onRefresh();
     }
   });
@@ -115,6 +175,8 @@ export function useBrowsedTools(
       const result = await parseToolDirectory(dirHandle);
       await chrome.storage.local.set({browsedTools: result});
       setBrowsedTools(result);
+      // Sync enabled local tools to unified toolCache
+      await syncLocalToolsToCache(result);
       // Refresh the registry to pick up new tools
       await onRefresh();
     } catch (error) {
@@ -153,6 +215,8 @@ export function useBrowsedTools(
       const result = await parseToolDirectory(cachedDirHandle);
       await chrome.storage.local.set({browsedTools: result});
       setBrowsedTools(result);
+      // Sync enabled local tools to unified toolCache
+      await syncLocalToolsToCache(result);
       await onRefresh();
     } catch (error) {
       setBrowsingError(

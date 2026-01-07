@@ -8,7 +8,7 @@ import type {
   EnabledTools
 } from '../shared.js';
 import {LOCAL_SOURCE} from '../shared.js';
-import {searchToolsGrouped, validateSource, refreshSourceCache} from '../tool-registry.js';
+import {searchToolsGrouped, validateSource, refreshToolCache} from '../tool-registry.js';
 
 export interface UseSourcesOptions {
   settings: WebMCPSettings;
@@ -85,29 +85,7 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
       return;
     }
 
-    if (!isLocal) {
-      const result = await validateSource(url);
-      if (!result.valid) {
-        setSourceError(url, result.error!);
-        removeFromRegistries(url);
-        setRefreshingSource(null);
-        return;
-      }
-
-      // Refresh source cache for enabled tools from this source
-      const storageResult = await chrome.storage.local.get<{enabledToolGroups: EnabledTools}>(['enabledToolGroups']);
-      const enabledTools = storageResult.enabledToolGroups || {};
-      const enabledToolNames = Object.values(enabledTools)
-        .filter(tool => tool.sourceUrl === url)
-        .map(tool => tool.name);
-
-      if (enabledToolNames.length > 0) {
-        const baseUrl = url.replace(/\/$/, '');
-        await refreshSourceCache(url, baseUrl, enabledToolNames);
-      }
-    }
-
-    // Reload the source's tools
+    // Fetch fresh manifest first (both to validate and get updated metadata)
     const sourceToRefresh = isLocal ? LOCAL_SOURCE : {url};
     const results = await searchToolsGrouped([sourceToRefresh], 'none');
     const sourceResult = results[0];
@@ -115,7 +93,40 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     if (sourceResult?.error) {
       setSourceError(url, sourceResult.error);
       removeFromRegistries(url);
-    } else if (sourceResult) {
+      setRefreshingSource(null);
+      return;
+    }
+
+    if (!isLocal && sourceResult) {
+      // Refresh source cache for enabled tools from this source
+      // Use fresh metadata from the manifest we just fetched
+      const storageResult = await chrome.storage.local.get<{enabledToolGroups: EnabledTools}>(['enabledToolGroups']);
+      const enabledTools = storageResult.enabledToolGroups || {};
+      const enabledToolNames = new Set(
+        Object.values(enabledTools)
+          .filter(tool => tool.sourceUrl === url)
+          .map(tool => tool.name)
+      );
+
+      // Find enabled tools in the refreshed manifest and get their full metadata
+      const toolsToRefresh = sourceResult.groups.flatMap(group =>
+        group.tools
+          .filter(tool => enabledToolNames.has(tool.name))
+          .map(tool => ({
+            name: tool.name,
+            domains: tool.domains,
+            pathPatterns: tool.pathPatterns,
+            description: tool.description
+          }))
+      );
+
+      if (toolsToRefresh.length > 0) {
+        const baseUrl = url.replace(/\/$/, '');
+        await refreshToolCache(url, baseUrl, toolsToRefresh);
+      }
+    }
+
+    if (sourceResult) {
       updateSourceInRegistry(url, sourceResult, isEnabled);
     }
 
