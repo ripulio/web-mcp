@@ -262,6 +262,7 @@ function connectToPort(port: number): void {
 
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data) as ServerMessage;
+    console.log(`${BC_LOG_PREFIX} Received from port ${port}:`, message);
     handleServerMessage(message, port);
   };
 
@@ -405,14 +406,16 @@ async function handleConnect(
   sessionId?: string
 ): Promise<void> {
   const tabs = await chrome.tabs.query({});
-  const tabInfos: BrowserControlTabInfo[] = tabs
-    .filter((tab) => tab.id !== undefined)
-    .map((tab) => ({
-      id: tab.id!,
-      title: tab.title || '',
-      url: tab.url || '',
-      tools: []
-    }));
+  const tabInfos: BrowserControlTabInfo[] = await Promise.all(
+    tabs
+      .filter((tab) => tab.id !== undefined)
+      .map(async (tab) => ({
+        id: tab.id!,
+        title: tab.title || '',
+        url: tab.url || '',
+        tools: await discoverPageTools(tab.id!)
+      }))
+  );
 
   sendToPort(sourcePort, {
     type: ExtensionMessageType.CONNECTED,
