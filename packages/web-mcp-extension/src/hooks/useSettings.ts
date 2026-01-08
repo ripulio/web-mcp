@@ -29,10 +29,11 @@ export function useSettings(): UseSettingsReturn {
       const nonLocalSources = storedSettings.packageSources.filter(
         (s) => s.type !== 'local' && s.url !== 'local'
       );
-      // Preserve user's enabled state, use LOCAL_SOURCE for other fields
+      // Preserve user's settings, use LOCAL_SOURCE for base fields
       const localSource = {
         ...LOCAL_SOURCE,
-        enabled: storedLocalSource?.enabled ?? LOCAL_SOURCE.enabled
+        enabled: storedLocalSource?.enabled ?? LOCAL_SOURCE.enabled,
+        autoEnable: storedLocalSource?.autoEnable
       };
       const mergedSettings: WebMCPSettings = {
         ...storedSettings,
