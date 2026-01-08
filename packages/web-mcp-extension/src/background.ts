@@ -249,8 +249,26 @@ function stopBrowserControl(): void {
   wsConnections.clear();
 }
 
-function connectToPort(port: number): void {
+async function isPortResponding(port: number): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 100);
+    await fetch(`http://localhost:${port}`, {
+      signal: controller.signal,
+      mode: 'no-cors',
+    });
+    clearTimeout(timeoutId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function connectToPort(port: number): Promise<void> {
   if (wsConnections.has(port)) return;
+
+  // Probe port first to avoid console spam from failed WebSocket connections
+  if (!(await isPortResponding(port))) return;
 
   const ws = new WebSocket(`ws://localhost:${port}`);
 
@@ -280,12 +298,14 @@ function connectToPort(port: number): void {
   };
 }
 
-function discoverServers(): void {
+async function discoverServers(): Promise<void> {
+  const promises: Promise<void>[] = [];
   for (let port = WS_PORT_START; port <= WS_PORT_END; port++) {
     if (!wsConnections.has(port)) {
-      connectToPort(port);
+      promises.push(connectToPort(port));
     }
   }
+  await Promise.all(promises);
 }
 
 function startDiscovery(): void {
