@@ -1,5 +1,4 @@
 import type {
-  CacheMode,
   PackageSource,
   RemoteManifest,
   RemoteTool,
@@ -11,6 +10,9 @@ import type {
 } from './shared.js';
 
 export type {ToolRegistryResult, GroupedToolRegistryResult};
+
+// Internal cache mode type (no longer user-configurable)
+type CacheMode = 'none' | 'session';
 
 // Session cache (in-memory)
 const sessionCache: ManifestCache = {};
@@ -151,66 +153,34 @@ async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
   }));
 }
 
-async function getCachedManifest(
+function getCachedManifest(
   url: string,
   cacheMode: CacheMode
-): Promise<ManifestCacheEntry | null> {
+): ManifestCacheEntry | null {
   if (cacheMode === 'none') {
     return null;
   }
-
-  if (cacheMode === 'session' || cacheMode === 'manual') {
-    return sessionCache[url] || null;
-  }
-
-  // persistent cache (cacheMode is object with type: 'persistent')
-  const result = await chrome.storage.local.get<{manifestCache: ManifestCache}>(
-    ['manifestCache']
-  );
-  return result.manifestCache?.[url] || null;
+  return sessionCache[url] || null;
 }
 
-async function setCachedManifest(
+function setCachedManifest(
   url: string,
   entry: ManifestCacheEntry,
   cacheMode: CacheMode
-): Promise<void> {
+): void {
   if (cacheMode === 'none') {
     return;
   }
-
-  if (cacheMode === 'session' || cacheMode === 'manual') {
-    sessionCache[url] = entry;
-    return;
-  }
-
-  // persistent cache (cacheMode is object with type: 'persistent')
-  const result = await chrome.storage.local.get<{manifestCache: ManifestCache}>(
-    ['manifestCache']
-  );
-  const cache = result.manifestCache || {};
-  cache[url] = entry;
-  await chrome.storage.local.set({manifestCache: cache});
-}
-
-function isCacheStale(
-  entry: ManifestCacheEntry,
-  cacheMode: CacheMode
-): boolean {
-  if (typeof cacheMode === 'object' && cacheMode.type === 'persistent') {
-    const ttlMs = cacheMode.ttlMinutes * 60 * 1000;
-    return Date.now() - entry.fetchedAt > ttlMs;
-  }
-  return false; // session mode never stale (until restart)
+  sessionCache[url] = entry;
 }
 
 async function getManifestWithCache(
   url: string,
   cacheMode: CacheMode
 ): Promise<RemoteManifest> {
-  const cached = await getCachedManifest(url, cacheMode);
+  const cached = getCachedManifest(url, cacheMode);
 
-  if (cached && !isCacheStale(cached, cacheMode)) {
+  if (cached) {
     return cached.data;
   }
 
@@ -221,7 +191,7 @@ async function getManifestWithCache(
     fetchedAt: Date.now()
   };
 
-  await setCachedManifest(url, entry, cacheMode);
+  setCachedManifest(url, entry, cacheMode);
   return manifest;
 }
 

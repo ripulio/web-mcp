@@ -2,7 +2,6 @@ import {useState} from 'preact/hooks';
 import type {
   WebMCPSettings,
   PackageSource,
-  CacheMode,
   GroupedToolRegistryResult,
   BrowsedToolsData,
   EnabledTools
@@ -13,7 +12,7 @@ import {searchToolsGrouped, validateSource, refreshToolCache} from '../tool-regi
 export interface UseSourcesOptions {
   settings: WebMCPSettings;
   saveSettings: (settings: WebMCPSettings) => Promise<void>;
-  loadRegistry: (sources: PackageSource[], cacheMode: CacheMode) => Promise<void>;
+  loadRegistry: (sources: PackageSource[]) => Promise<void>;
   clearSourceError: (url: string) => void;
   setSourceError: (url: string, error: string) => void;
   removeFromRegistries: (sourceUrl: string) => void;
@@ -175,7 +174,7 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     setAddingSource(false);
 
     // Reload registry with new source
-    await loadRegistry(newSettings.packageSources, newSettings.cacheMode);
+    await loadRegistry(newSettings.packageSources);
   };
 
   const handleRemoveSource = async (url: string) => {

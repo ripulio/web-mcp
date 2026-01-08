@@ -4,9 +4,6 @@ export type {ToolEntryProps} from './ToolEntry.js';
 export {AddSourceForm} from './AddSourceForm.js';
 export type {AddSourceFormProps} from './AddSourceForm.js';
 
-export {CacheModeSection} from './CacheModeSection.js';
-export type {CacheModeSectionProps} from './CacheModeSection.js';
-
 export {ToolGroup} from './ToolGroup.js';
 export type {ToolGroupProps} from './ToolGroup.js';
 

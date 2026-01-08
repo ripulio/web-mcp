@@ -15,7 +15,6 @@ import {
 import {
   SourceList,
   AddSourceForm,
-  CacheModeSection,
   ToolsSection,
   BrowserControlSection
 } from './components/index.js';
@@ -28,10 +27,7 @@ function Panel() {
 
   const browsedToolsHook = useBrowsedTools({
     onRefresh: async () => {
-      await registryHook.loadRegistry(
-        settingsHook.settings.packageSources,
-        'none'
-      );
+      await registryHook.loadRegistry(settingsHook.settings.packageSources);
     }
   });
 
@@ -58,24 +54,9 @@ function Panel() {
   // Initial load - coordinate settings and registry
   useEffect(() => {
     if (!settingsHook.loading) {
-      registryHook.loadRegistry(
-        settingsHook.settings.packageSources,
-        settingsHook.settings.cacheMode
-      );
+      registryHook.loadRegistry(settingsHook.settings.packageSources);
     }
   }, [settingsHook.loading]);
-
-  // Handle cache mode change that requires refresh
-  const handleCacheModeChange = async (
-    mode: 'none' | 'session' | 'manual' | 'persistent'
-  ) => {
-    await settingsHook.handleCacheModeChange(mode, async (newCacheMode) => {
-      await registryHook.loadRegistry(
-        settingsHook.settings.packageSources,
-        newCacheMode
-      );
-    });
-  };
 
   // Filter registry based on search
   const filteredRegistry = searchHook.filterRegistry(registryHook.activeRegistry);
@@ -131,15 +112,6 @@ function Panel() {
             onClearError={sourcesHook.clearAddSourceError}
           />
         </div>
-
-        {/* Cache Mode Section */}
-        <CacheModeSection
-          cacheMode={settingsHook.cacheMode}
-          cacheTTL={settingsHook.cacheTTL}
-          isPersistent={settingsHook.isPersistent}
-          onCacheModeChange={handleCacheModeChange}
-          onTTLChange={settingsHook.handleTTLChange}
-        />
 
         {/* Browser Control MCP Server Section */}
         <BrowserControlSection

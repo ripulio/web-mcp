@@ -26,12 +26,6 @@ export interface EnabledTools {
   [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`
 }
 
-export type CacheMode =
-  | 'none'
-  | 'session'
-  | 'manual'
-  | {type: 'persistent'; ttlMinutes: number};
-
 export interface PackageSource {
   url: string;
   name?: string;
@@ -47,7 +41,6 @@ export const LOCAL_SOURCE: PackageSource = {
 };
 
 export interface WebMCPSettings {
-  cacheMode: CacheMode;
   packageSources: PackageSource[];
   browserControlEnabled: boolean;
 }
@@ -57,7 +50,6 @@ export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
 };
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
-  cacheMode: {type: 'persistent', ttlMinutes: 60},
   packageSources: [LOCAL_SOURCE, DEFAULT_PACKAGE_SOURCE],
   browserControlEnabled: false
 };

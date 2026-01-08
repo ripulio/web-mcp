@@ -1,20 +1,12 @@
 import {useState, useEffect} from 'preact/hooks';
-import type {WebMCPSettings, CacheMode} from '../shared.js';
+import type {WebMCPSettings} from '../shared.js';
 import {DEFAULT_SETTINGS, LOCAL_SOURCE} from '../shared.js';
 
 export interface UseSettingsReturn {
   settings: WebMCPSettings;
   loading: boolean;
-  cacheMode: CacheMode;
-  isPersistent: boolean;
-  cacheTTL: number;
   browserControlEnabled: boolean;
   saveSettings: (newSettings: WebMCPSettings) => Promise<void>;
-  handleCacheModeChange: (
-    mode: 'none' | 'session' | 'manual' | 'persistent',
-    onModeChange?: (newCacheMode: CacheMode) => void
-  ) => Promise<void>;
-  handleTTLChange: (ttl: number) => Promise<void>;
   handleBrowserControlToggle: (enabled: boolean) => Promise<void>;
 }
 
@@ -57,36 +49,6 @@ export function useSettings(): UseSettingsReturn {
     await chrome.storage.local.set({webmcpSettings: newSettings});
   };
 
-  const cacheMode = settings.cacheMode;
-  const isPersistent =
-    typeof cacheMode === 'object' && cacheMode.type === 'persistent';
-  const cacheTTL = isPersistent ? cacheMode.ttlMinutes : 60;
-
-  const handleCacheModeChange = async (
-    mode: 'none' | 'session' | 'manual' | 'persistent',
-    onModeChange?: (newCacheMode: CacheMode) => void
-  ) => {
-    const previousMode = settings.cacheMode;
-    const newCacheMode: CacheMode =
-      mode === 'persistent' ? {type: 'persistent', ttlMinutes: cacheTTL} : mode;
-    const newSettings = {...settings, cacheMode: newCacheMode};
-    await saveSettings(newSettings);
-
-    // Notify caller when switching TO "none" (user expects fresh data)
-    if (mode === 'none' && previousMode !== 'none' && onModeChange) {
-      onModeChange(newCacheMode);
-    }
-  };
-
-  const handleTTLChange = async (ttl: number) => {
-    if (ttl < 1) return;
-    const newSettings = {
-      ...settings,
-      cacheMode: {type: 'persistent' as const, ttlMinutes: ttl}
-    };
-    await saveSettings(newSettings);
-  };
-
   const browserControlEnabled = settings.browserControlEnabled ?? false;
 
   const handleBrowserControlToggle = async (enabled: boolean) => {
@@ -103,13 +65,8 @@ export function useSettings(): UseSettingsReturn {
   return {
     settings,
     loading,
-    cacheMode,
-    isPersistent,
-    cacheTTL,
     browserControlEnabled,
     saveSettings,
-    handleCacheModeChange,
-    handleTTLChange,
     handleBrowserControlToggle
   };
 }

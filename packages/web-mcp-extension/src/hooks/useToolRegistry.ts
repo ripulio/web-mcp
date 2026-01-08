@@ -1,6 +1,5 @@
 import {useState} from 'preact/hooks';
 import type {
-  CacheMode,
   PackageSource,
   GroupedToolRegistryResult
 } from '../shared.js';
@@ -11,10 +10,7 @@ export interface UseToolRegistryReturn {
   inactiveRegistry: GroupedToolRegistryResult[];
   sourceErrors: {[url: string]: string};
   loading: boolean;
-  loadRegistry: (
-    sources: PackageSource[],
-    cacheMode: CacheMode
-  ) => Promise<void>;
+  loadRegistry: (sources: PackageSource[]) => Promise<void>;
   clearSourceError: (url: string) => void;
   setSourceError: (url: string, error: string) => void;
   moveToActive: (sourceUrl: string, data: GroupedToolRegistryResult) => void;
@@ -37,12 +33,10 @@ export function useToolRegistry(): UseToolRegistryReturn {
   const [sourceErrors, setSourceErrors] = useState<{[url: string]: string}>({});
   const [loading, setLoading] = useState(true);
 
-  const loadRegistry = async (
-    sources: PackageSource[],
-    cacheMode: CacheMode
-  ) => {
+  const loadRegistry = async (sources: PackageSource[]) => {
     setLoading(true);
-    const results = await searchToolsGrouped(sources, cacheMode);
+    // Use session cache - manifest cached until browser restart
+    const results = await searchToolsGrouped(sources, 'session');
 
     // Extract errors from results
     const errors: {[url: string]: string} = {};

@@ -19,19 +19,31 @@ interface ToolToInject {
   source: string;
 }
 
-// Per-tab state storage for invocation tracking
-const tabStates = new Map<number, TabToolState>();
+// Per-tab state storage helpers (persisted to session storage to survive SW restarts)
+async function getTabState(tabId: number): Promise<TabToolState | null> {
+  const key = `tabState:${tabId}`;
+  const result = await chrome.storage.session.get<{[key: string]: TabToolState}>(key);
+  return result[key] ?? null;
+}
+
+async function setTabState(tabId: number, state: TabToolState): Promise<void> {
+  await chrome.storage.session.set({[`tabState:${tabId}`]: state});
+}
+
+async function deleteTabState(tabId: number): Promise<void> {
+  await chrome.storage.session.remove(`tabState:${tabId}`);
+}
 
 // Clear state when tab URL changes or tab starts loading
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url || changeInfo.status === 'loading') {
-    tabStates.delete(tabId);
+    deleteTabState(tabId);
   }
 });
 
 // Clean up when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  tabStates.delete(tabId);
+  deleteTabState(tabId);
 });
 
 // Handle messages from content script and popup
@@ -54,8 +66,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Handle popup requests (no sender.tab)
   if (message.type === 'WEBMCP_GET_TAB_STATE') {
-    const state = tabStates.get(message.tabId) ?? null;
-    sendResponse({state});
+    getTabState(message.tabId).then((state) => {
+      sendResponse({state});
+    });
     return true;
   }
 
@@ -83,63 +96,67 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log(`[WebMCP] Injecting ${tools.length} tools into tab ${tabId}:`, toolNames);
 
     // Initialize or update tab state with injected tools
-    const existingState = tabStates.get(tabId);
-    if (existingState) {
-      // Add new tools to existing state
-      const existingSet = new Set(existingState.injectedTools);
-      for (const name of toolNames) {
-        existingSet.add(name);
+    (async () => {
+      const existingState = await getTabState(tabId);
+      if (existingState) {
+        // Add new tools to existing state
+        const existingSet = new Set(existingState.injectedTools);
+        for (const name of toolNames) {
+          existingSet.add(name);
+        }
+        existingState.injectedTools = [...existingSet];
+        await setTabState(tabId, existingState);
+      } else {
+        // Create new state
+        await setTabState(tabId, {
+          tabId,
+          url: sender.tab?.url ?? '',
+          injectedTools: toolNames,
+          invocations: []
+        });
       }
-      existingState.injectedTools = [...existingSet];
-    } else {
-      // Create new state
-      tabStates.set(tabId, {
-        tabId,
-        url: sender.tab.url ?? '',
-        injectedTools: toolNames,
-        invocations: []
-      });
-    }
 
-    injectTools(tabId, tools)
-      .then((result) => {
-        console.log(`[WebMCP] Tool injection complete for tab ${tabId}`);
-        sendResponse(result);
-      })
-      .catch((error) => {
-        console.error(`[WebMCP] Tool injection failed:`, error);
-        sendResponse({success: false, error: error.message});
-      });
+      const result = await injectTools(tabId, tools);
+      console.log(`[WebMCP] Tool injection complete for tab ${tabId}`);
+      sendResponse(result);
+    })().catch((error) => {
+      console.error(`[WebMCP] Tool injection failed:`, error);
+      sendResponse({success: false, error: error.message});
+    });
     return true;
   }
 
   if (message.type === 'WEBMCP_TOOL_INVOCATION_START') {
-    const state = tabStates.get(tabId);
-    if (state) {
-      const invocation: ToolInvocation = {
-        id: message.invocationId,
-        toolName: message.toolName,
-        args: message.args,
-        result: null,
-        startedAt: Date.now(),
-        completedAt: null,
-        isError: false
-      };
-      state.invocations.push(invocation);
-    }
+    getTabState(tabId).then(async (state) => {
+      if (state) {
+        const invocation: ToolInvocation = {
+          id: message.invocationId,
+          toolName: message.toolName,
+          args: message.args,
+          result: null,
+          startedAt: Date.now(),
+          completedAt: null,
+          isError: false
+        };
+        state.invocations.push(invocation);
+        await setTabState(tabId, state);
+      }
+    });
     return;
   }
 
   if (message.type === 'WEBMCP_TOOL_INVOCATION_END') {
-    const state = tabStates.get(tabId);
-    if (state) {
-      const invocation = state.invocations.find((i) => i.id === message.invocationId);
-      if (invocation) {
-        invocation.result = message.result;
-        invocation.completedAt = Date.now();
-        invocation.isError = message.isError;
+    getTabState(tabId).then(async (state) => {
+      if (state) {
+        const invocation = state.invocations.find((i) => i.id === message.invocationId);
+        if (invocation) {
+          invocation.result = message.result;
+          invocation.completedAt = Date.now();
+          invocation.isError = message.isError;
+          await setTabState(tabId, state);
+        }
       }
-    }
+    });
     return;
   }
 });
