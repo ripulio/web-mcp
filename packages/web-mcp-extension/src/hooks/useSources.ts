@@ -27,6 +27,7 @@ export interface UseSourcesOptions {
   activeRegistry: GroupedToolRegistryResult[];
   browsedTools: BrowsedToolsData | null;
   onRefreshBrowsedTools: () => Promise<void>;
+  onAutoEnable?: (sourceUrl: string, registry: GroupedToolRegistryResult, baseUrl: string) => Promise<void>;
 }
 
 export interface UseSourcesReturn {
@@ -40,6 +41,7 @@ export interface UseSourcesReturn {
   handleRemoveSource: (url: string) => Promise<void>;
   handleSourceToggle: (url: string, enabled: boolean) => Promise<void>;
   handleRefreshSource: (url: string) => Promise<void>;
+  handleAutoEnableToggle: (url: string, autoEnable: boolean) => Promise<void>;
 }
 
 export function useSources(options: UseSourcesOptions): UseSourcesReturn {
@@ -56,7 +58,8 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     inactiveRegistry,
     activeRegistry,
     browsedTools,
-    onRefreshBrowsedTools
+    onRefreshBrowsedTools,
+    onAutoEnable
   } = options;
 
   const [newSourceUrl, setNewSourceUrl] = useState('');
@@ -127,6 +130,12 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
 
     if (sourceResult) {
       updateSourceInRegistry(url, sourceResult, isEnabled);
+
+      // Auto-enable new tools if source has autoEnable=true
+      if (source?.autoEnable && onAutoEnable) {
+        const baseUrl = isLocal ? 'local' : url.replace(/\/$/, '');
+        await onAutoEnable(isLocal ? 'local' : url, sourceResult, baseUrl);
+      }
     }
 
     setRefreshingSource(null);
@@ -238,6 +247,16 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     }
   };
 
+  const handleAutoEnableToggle = async (url: string, autoEnable: boolean) => {
+    const newSettings = {
+      ...settings,
+      packageSources: settings.packageSources.map((s) =>
+        s.url === url ? {...s, autoEnable} : s
+      )
+    };
+    await saveSettings(newSettings);
+  };
+
   return {
     newSourceUrl,
     setNewSourceUrl,
@@ -248,6 +267,7 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     handleAddSource,
     handleRemoveSource,
     handleSourceToggle,
-    handleRefreshSource
+    handleRefreshSource,
+    handleAutoEnableToggle
   };
 }

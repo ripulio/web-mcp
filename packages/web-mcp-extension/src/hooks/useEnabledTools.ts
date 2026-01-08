@@ -6,7 +6,10 @@ import type {
   ToolGroupResult,
   ToolCache,
   CachedToolData,
-  BrowsedToolsData
+  BrowsedToolsData,
+  DisabledTools,
+  DisabledGroups,
+  GroupedToolRegistryResult
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
 
@@ -27,6 +30,8 @@ export type GroupToggleState = 'all' | 'none' | 'partial';
 
 export interface UseEnabledToolsReturn {
   enabledTools: EnabledTools;
+  disabledTools: DisabledTools;
+  disabledGroups: DisabledGroups;
   fetchingIds: Set<string>;
   fetchErrors: {[id: string]: string};
   handleToolToggle: (entry: ToolRegistryResult) => Promise<void>;
@@ -39,10 +44,17 @@ export interface UseEnabledToolsReturn {
     group: ToolGroupResult,
     sourceUrl: string
   ) => GroupToggleState;
+  autoEnableTools: (
+    sourceUrl: string,
+    registry: GroupedToolRegistryResult,
+    baseUrl: string
+  ) => Promise<void>;
 }
 
 export function useEnabledTools(): UseEnabledToolsReturn {
   const [enabledTools, setEnabledTools] = useState<EnabledTools>({});
+  const [disabledTools, setDisabledTools] = useState<DisabledTools>({});
+  const [disabledGroups, setDisabledGroups] = useState<DisabledGroups>({});
   const [fetchingIds, setFetchingIds] = useState<Set<string>>(new Set());
   const [fetchErrors, setFetchErrors] = useState<{[id: string]: string}>({});
 
@@ -50,9 +62,12 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     (async () => {
       const result = await chrome.storage.local.get<{
         enabledToolGroups: EnabledTools;
-      }>(['enabledToolGroups']);
-      const storedTools: EnabledTools = result.enabledToolGroups || {};
-      setEnabledTools(storedTools);
+        disabledTools: DisabledTools;
+        disabledGroups: DisabledGroups;
+      }>(['enabledToolGroups', 'disabledTools', 'disabledGroups']);
+      setEnabledTools(result.enabledToolGroups || {});
+      setDisabledTools(result.disabledTools || {});
+      setDisabledGroups(result.disabledGroups || {});
     })();
   }, []);
 
@@ -75,10 +90,15 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     const storedTool = enabledTools[compositeId];
 
     if (storedTool) {
-      // Disable - remove from storage
-      const {[compositeId]: _, ...rest} = enabledTools;
-      setEnabledTools(rest);
-      await chrome.storage.local.set({enabledToolGroups: rest});
+      // Disable - remove from enabledTools, add to disabledTools
+      const {[compositeId]: _, ...restEnabled} = enabledTools;
+      const updatedDisabled = {...disabledTools, [compositeId]: true as const};
+      setEnabledTools(restEnabled);
+      setDisabledTools(updatedDisabled);
+      await chrome.storage.local.set({
+        enabledToolGroups: restEnabled,
+        disabledTools: updatedDisabled
+      });
       return;
     }
 
@@ -145,15 +165,20 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       });
     }
 
-    // Store only reference in enabledToolGroups
+    // Store reference in enabledToolGroups and remove from disabledTools
     const newStoredTool: StoredTool = {
       name: entry.name,
       sourceUrl: entry.sourceUrl
     };
 
-    const updatedTools = {...enabledTools, [compositeId]: newStoredTool};
-    setEnabledTools(updatedTools);
-    await chrome.storage.local.set({enabledToolGroups: updatedTools});
+    const updatedEnabled = {...enabledTools, [compositeId]: newStoredTool};
+    const {[compositeId]: _, ...restDisabled} = disabledTools;
+    setEnabledTools(updatedEnabled);
+    setDisabledTools(restDisabled);
+    await chrome.storage.local.set({
+      enabledToolGroups: updatedEnabled,
+      disabledTools: restDisabled
+    });
   };
 
   const handleGroupToggle = async (
@@ -250,29 +275,162 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         return next;
       });
 
+      // Remove tools from disabledTools and group from disabledGroups
+      const groupId = `${sourceUrl}:${group.name}`;
+      const updatedDisabledTools = {...disabledTools};
+      for (const tool of group.tools) {
+        const compositeId = `${sourceUrl}:${tool.name}`;
+        delete updatedDisabledTools[compositeId];
+      }
+      const {[groupId]: _, ...updatedDisabledGroups} = disabledGroups;
+
       setEnabledTools(updatedTools);
-      await chrome.storage.local.set({enabledToolGroups: updatedTools});
+      setDisabledTools(updatedDisabledTools);
+      setDisabledGroups(updatedDisabledGroups);
+      await chrome.storage.local.set({
+        enabledToolGroups: updatedTools,
+        disabledTools: updatedDisabledTools,
+        disabledGroups: updatedDisabledGroups
+      });
       if (Object.keys(newErrors).length > 0) {
         setFetchErrors((prev) => ({...prev, ...newErrors}));
       }
     } else {
-      // Disable all tools in group
-      const updatedTools = {...enabledTools};
+      // Disable all tools in group - add to disabledGroups
+      const groupId = `${sourceUrl}:${group.name}`;
+      const updatedEnabledTools = {...enabledTools};
       for (const tool of group.tools) {
         const compositeId = `${sourceUrl}:${tool.name}`;
-        delete updatedTools[compositeId];
+        delete updatedEnabledTools[compositeId];
       }
-      setEnabledTools(updatedTools);
-      await chrome.storage.local.set({enabledToolGroups: updatedTools});
+      const updatedDisabledGroups = {...disabledGroups, [groupId]: true as const};
+
+      setEnabledTools(updatedEnabledTools);
+      setDisabledGroups(updatedDisabledGroups);
+      await chrome.storage.local.set({
+        enabledToolGroups: updatedEnabledTools,
+        disabledGroups: updatedDisabledGroups
+      });
+    }
+  };
+
+  // Auto-enable all tools from a source that aren't disabled
+  const autoEnableTools = async (
+    sourceUrl: string,
+    registry: GroupedToolRegistryResult,
+    baseUrl: string
+  ) => {
+    const isLocal = sourceUrl === 'local';
+    const toolsToEnable: ToolRegistryResult[] = [];
+
+    // Find tools that should be auto-enabled
+    for (const group of registry.groups) {
+      const groupId = `${sourceUrl}:${group.name}`;
+      // Skip if group is disabled
+      if (disabledGroups[groupId]) continue;
+
+      for (const tool of group.tools) {
+        const compositeId = `${sourceUrl}:${tool.name}`;
+        // Skip if already enabled or explicitly disabled
+        if (enabledTools[compositeId] || disabledTools[compositeId]) continue;
+        toolsToEnable.push(tool);
+      }
+    }
+
+    if (toolsToEnable.length === 0) return;
+
+    const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
+    const updatedTools = {...enabledTools};
+    const newErrors: {[id: string]: string} = {};
+
+    setFetchingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+
+    // Get tool data and store in unified toolCache
+    const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache; browsedTools: BrowsedToolsData}>(['toolCache', 'browsedTools']);
+    const toolCache = cacheResult.toolCache || {};
+    if (!toolCache[sourceUrl]) {
+      toolCache[sourceUrl] = {};
+    }
+
+    if (isLocal) {
+      const browsedTools = cacheResult.browsedTools;
+      for (const tool of toolsToEnable) {
+        const compositeId = `${sourceUrl}:${tool.name}`;
+        const browsedTool = browsedTools?.tools.find(t => t.id === tool.name);
+        if (browsedTool) {
+          const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+          toolCache[sourceUrl][tool.name] = {
+            source: browsedTool.source,
+            domains,
+            pathPatterns,
+            description: browsedTool.description
+          };
+          updatedTools[compositeId] = {
+            name: tool.name,
+            sourceUrl
+          };
+        } else {
+          newErrors[compositeId] = 'Tool not found in browsed tools';
+        }
+      }
+    } else {
+      const results = await Promise.allSettled(
+        toolsToEnable.map(async (tool) => {
+          const source = await fetchToolSource(baseUrl, tool.name);
+          return {tool, source};
+        })
+      );
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const tool = toolsToEnable[i];
+        const compositeId = `${sourceUrl}:${tool.name}`;
+
+        if (result.status === 'fulfilled') {
+          toolCache[sourceUrl][tool.name] = {
+            source: result.value.source,
+            domains: tool.domains,
+            pathPatterns: tool.pathPatterns,
+            description: tool.description
+          };
+          updatedTools[compositeId] = {
+            name: tool.name,
+            sourceUrl
+          };
+        } else {
+          newErrors[compositeId] =
+            result.reason?.message || 'Failed to fetch tool';
+        }
+      }
+    }
+
+    await chrome.storage.local.set({toolCache});
+    setFetchingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+
+    setEnabledTools(updatedTools);
+    await chrome.storage.local.set({enabledToolGroups: updatedTools});
+    if (Object.keys(newErrors).length > 0) {
+      setFetchErrors((prev) => ({...prev, ...newErrors}));
     }
   };
 
   return {
     enabledTools,
+    disabledTools,
+    disabledGroups,
     fetchingIds,
     fetchErrors,
     handleToolToggle,
     handleGroupToggle,
-    getGroupToggleState
+    getGroupToggleState,
+    autoEnableTools
   };
 }

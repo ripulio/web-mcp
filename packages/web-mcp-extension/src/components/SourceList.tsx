@@ -1,3 +1,4 @@
+import {useState} from 'preact/hooks';
 import type {PackageSource, BrowsedToolsData, GroupedToolRegistryResult} from '../shared.js';
 import {formatSourceUrl} from '../utils/format.js';
 
@@ -19,6 +20,7 @@ export interface SourceListProps {
   pollingEnabled: boolean;
   pollingError: string | null;
   onPollingToggle: (enabled: boolean) => void;
+  onAutoEnableToggle: (url: string, autoEnable: boolean) => void;
 }
 
 export function SourceList({
@@ -38,8 +40,11 @@ export function SourceList({
   onClearBrowsedTools,
   pollingEnabled,
   pollingError,
-  onPollingToggle
+  onPollingToggle,
+  onAutoEnableToggle
 }: SourceListProps) {
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
   const getSourceGroupCount = (sourceUrl: string): number | null => {
     const entry =
       activeRegistry.find((r) => r.sourceUrl === sourceUrl) ||
@@ -163,6 +168,30 @@ export function SourceList({
                   ×
                 </button>
               )}
+              <div class="source-menu-container">
+                <button
+                  class="source-menu-btn"
+                  onClick={() => setOpenMenu(openMenu === source.url ? null : source.url)}
+                  title="Source options"
+                >
+                  ⋮
+                </button>
+                {openMenu === source.url && (
+                  <div class="source-menu-dropdown">
+                    <label class="source-menu-item">
+                      <input
+                        type="checkbox"
+                        checked={source.autoEnable === true}
+                        onChange={() => {
+                          onAutoEnableToggle(source.url, !source.autoEnable);
+                          setOpenMenu(null);
+                        }}
+                      />
+                      <span>Auto-enable new tools</span>
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
             {isLocal && browsingError && (
               <div class="browsing-error">{browsingError}</div>

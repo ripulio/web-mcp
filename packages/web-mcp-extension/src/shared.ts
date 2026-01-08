@@ -31,6 +31,16 @@ export interface PackageSource {
   name?: string;
   type?: 'remote' | 'local';
   enabled?: boolean; // defaults to true
+  autoEnable?: boolean; // auto-enable new tools on refresh, defaults to false
+}
+
+// Tools/groups explicitly disabled by user (respected by auto-enable)
+export interface DisabledTools {
+  [compositeId: string]: true; // compositeId = `${sourceUrl}:${toolName}`
+}
+
+export interface DisabledGroups {
+  [groupId: string]: true; // groupId = `${sourceUrl}:${groupName}`
 }
 
 export const LOCAL_SOURCE: PackageSource = {

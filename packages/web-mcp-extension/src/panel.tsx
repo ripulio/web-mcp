@@ -44,7 +44,8 @@ function Panel() {
     inactiveRegistry: registryHook.inactiveRegistry,
     activeRegistry: registryHook.activeRegistry,
     browsedTools: browsedToolsHook.browsedTools,
-    onRefreshBrowsedTools: browsedToolsHook.handleRefreshBrowsedTools
+    onRefreshBrowsedTools: browsedToolsHook.handleRefreshBrowsedTools,
+    onAutoEnable: enabledToolsHook.autoEnableTools
   });
 
   const searchHook = useToolSearch();
@@ -102,6 +103,7 @@ function Panel() {
             pollingEnabled={browsedToolsHook.pollingEnabled}
             pollingError={browsedToolsHook.pollingError}
             onPollingToggle={browsedToolsHook.handlePollingToggle}
+            onAutoEnableToggle={sourcesHook.handleAutoEnableToggle}
           />
           <AddSourceForm
             newSourceUrl={sourcesHook.newSourceUrl}
