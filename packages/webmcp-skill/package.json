@@ -1,0 +1,21 @@
+{
+  "name": "webmcp-skill",
+  "version": "0.0.1",
+  "description": "Agent skill for interacting with navigator.modelContext API in web pages",
+  "files": [
+    ".claude-plugin",
+    "skills",
+    "README.md"
+  ],
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "agent-skill",
+    "claude-code",
+    "codex",
+    "opencode",
+    "claude-plugin"
+  ],
+  "license": "MIT",
+  "type": "module"
+}
