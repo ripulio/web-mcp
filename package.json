@@ -9,18 +9,18 @@
     "build": "npm run --workspaces --if-present build",
     "test": "vitest run",
     "lint": "npm run lint:format && npm run lint:js",
-    "format": "prettier --write \"packages/*/{test,src}/**/*.ts\"",
-    "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\"",
+    "format": "prettier --write \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
+    "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
     "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\""
   },
   "devDependencies": {
-    "@eslint/js": "^9.36.0",
-    "eslint": "^9.36.0",
-    "globals": "^16.4.0",
-    "@vitest/browser": "^3.2.4",
-    "playwright": "^1.55.1",
-    "prettier": "^3.6.2",
-    "typescript-eslint": "^8.44.1",
-    "vitest": "^3.2.4"
+    "@eslint/js": "^9.39.2",
+    "@vitest/browser-playwright": "^4.0.16",
+    "eslint": "^9.39.2",
+    "globals": "^17.0.0",
+    "playwright": "^1.57.0",
+    "prettier": "^3.7.4",
+    "typescript-eslint": "^8.51.0",
+    "vitest": "^4.0.16"
   }
 }
