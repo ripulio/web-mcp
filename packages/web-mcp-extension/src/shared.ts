@@ -56,7 +56,7 @@ export interface WebMCPSettings {
 }
 
 export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
-  url: 'https://feature-cf-worker-preview-webmcp-catalog.james-garbutt.workers.dev/api'
+  url: 'https://web-mcp.org/api'
 };
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
