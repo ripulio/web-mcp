@@ -1,76 +1,90 @@
+import type {ToolDefinition} from 'webmcp-polyfill';
 import 'webmcp-polyfill';
-import type {EnabledToolGroups} from './shared.js';
 
-const registeredTools = new Set<string>();
-
-function updateTools(
-  enabledToolGroups: EnabledToolGroups,
-  currentDomain: string,
-  currentPath: string
-) {
-  if (!navigator.modelContext) {
-    console.warn(
-      '[WebMCP] navigator.modelContext not available, user tools not registered'
-    );
-    return;
-  }
-
-  const toolsToRegister = new Set<string>();
-
-  for (const toolGroup of Object.values(enabledToolGroups)) {
-    const domainMatches = toolGroup.domains.some(
-      (domain) => currentDomain === domain
-    );
-
-    if (!domainMatches) {
-      continue;
-    }
-
-    for (const tool of toolGroup.tools) {
-      const pathMatches =
-        !tool.pathPattern || new RegExp(tool.pathPattern).test(currentPath);
-
-      if (!pathMatches) {
-        continue;
-      }
-
-      try {
-        // TODO (jg): user scripts
-        const toolFn = new Function('return ' + tool.source);
-        const toolObject = toolFn();
-
-        navigator.modelContext.registerTool(toolObject);
-        toolsToRegister.add(toolObject.name);
-      } catch (error) {
-        console.error(
-          `[WebMCP DevTools] Failed to register tool from group ${toolGroup.name}:`,
-          error
-        );
-      }
-    }
-  }
-
-  for (const toolName of registeredTools) {
-    if (!toolsToRegister.has(toolName)) {
-      try {
-        navigator.modelContext.unregisterTool(toolName);
-      } catch (error) {
-        console.error(`[WebMCP] Failed to unregister tool ${toolName}:`, error);
-      }
-    }
-  }
-
-  registeredTools.clear();
-  for (const toolName of toolsToRegister) {
-    registeredTools.add(toolName);
+// Helper to safely serialize objects for postMessage
+function sanitizeForMessage(obj: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return {_serializationError: true, value: String(obj)};
   }
 }
 
+// Wrap registerTool to intercept tool invocations
+// The polyfill guarantees navigator.modelContext exists after import
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+const modelContext = navigator.modelContext!;
+const originalRegisterTool = modelContext.registerTool.bind(modelContext);
+
+modelContext.registerTool = (tool: ToolDefinition) => {
+  const originalExecute = tool.execute;
+
+  const wrappedTool: ToolDefinition = {
+    ...tool,
+    execute: async (args: unknown) => {
+      const invocationId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+      // Notify invocation start
+      window.postMessage(
+        {
+          type: 'WEBMCP_TOOL_INVOCATION_START',
+          toolName: tool.name,
+          args: sanitizeForMessage(args),
+          invocationId
+        },
+        '*'
+      );
+
+      try {
+        const result = await originalExecute.call(tool, args);
+
+        // Notify invocation success
+        window.postMessage(
+          {
+            type: 'WEBMCP_TOOL_INVOCATION_END',
+            invocationId,
+            result: sanitizeForMessage(result),
+            isError: result.isError ?? false
+          },
+          '*'
+        );
+
+        return result;
+      } catch (error) {
+        // Notify invocation error
+        window.postMessage(
+          {
+            type: 'WEBMCP_TOOL_INVOCATION_END',
+            invocationId,
+            result: {
+              content: [{type: 'text', text: String(error)}],
+              isError: true
+            },
+            isError: true
+          },
+          '*'
+        );
+        throw error;
+      }
+    }
+  };
+
+  originalRegisterTool(wrappedTool);
+};
+
+// Signal that polyfill is ready
 window.postMessage({type: 'WEBMCP_INJECTOR_READY'}, '*');
 
+// Listen for unregister requests from content script
 window.addEventListener('message', (event: MessageEvent) => {
-  if (event.data.type === 'WEBMCP_UPDATE_TOOLS') {
-    const {enabledToolGroups, currentDomain, currentPath} = event.data;
-    updateTools(enabledToolGroups, currentDomain, currentPath);
+  if (event.data.type === 'WEBMCP_UNREGISTER_TOOLS' && navigator.modelContext) {
+    const toolNames: string[] = event.data.toolNames;
+    for (const name of toolNames) {
+      try {
+        navigator.modelContext.unregisterTool(name);
+      } catch (error) {
+        console.error(`[WebMCP] Failed to unregister tool ${name}:`, error);
+      }
+    }
   }
 });

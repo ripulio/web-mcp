@@ -20,8 +20,8 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': 'off'
     },
     extends: [
-      tseslint.configs.strict,
-      eslintjs.configs.recommended
+      eslintjs.configs.recommended,
+      tseslint.configs.strict
     ]
   },
   {

@@ -20,9 +20,11 @@ async function build() {
   try {
     console.log('Building WebMCP extension...');
 
-    // Build user-tools-injector.ts (injected into page to register user tools)
+    // Build user-tools-injector.ts (injected into page via userScripts.execute)
+    // Use IIFE format for plain script injection (not ES module)
     await esbuild.build({
       ...commonConfig,
+      format: 'iife',
       entryPoints: [join(srcDir, 'user-tools-injector.ts')],
       outfile: join(extensionDir, 'user-tools-injector.js')
     });
@@ -35,6 +37,14 @@ async function build() {
       outfile: join(extensionDir, 'panel.js')
     });
     console.log('✓ Built panel.js');
+
+    // Build popup (invocation tracking)
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(srcDir, 'popup.tsx')],
+      outfile: join(extensionDir, 'popup.js')
+    });
+    console.log('✓ Built popup.js');
 
     // Build background service worker
     await esbuild.build({
@@ -59,6 +69,14 @@ async function build() {
       outfile: join(extensionDir, 'main.css')
     });
     console.log('✓ Built main.css');
+
+    // Build popup styles
+    await esbuild.build({
+      ...commonConfig,
+      entryPoints: [join(cssDir, 'popup.css')],
+      outfile: join(extensionDir, 'popup.css')
+    });
+    console.log('✓ Built popup.css');
 
     console.log('\nBuild complete! Extension ready in ./extension/');
   } catch (error) {

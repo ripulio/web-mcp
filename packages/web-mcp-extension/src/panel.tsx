@@ -1,61 +1,69 @@
 import {render} from 'preact';
-import {useState, useEffect} from 'preact/hooks';
-import type {EnabledToolGroups, StoredToolGroup} from './shared.js';
-import {searchTools, type ToolRegistryResult} from './tool-registry.js';
+import {useEffect} from 'preact/hooks';
+
+import {
+  useSettings,
+  useToolRegistry,
+  useEnabledTools,
+  useBrowsedTools,
+  useSources,
+  useToolSearch,
+  useExpandableUI,
+  useBrowserControlStatus
+} from './hooks/index.js';
+
+import {
+  SourceList,
+  AddSourceForm,
+  ToolsSection,
+  BrowserControlSection
+} from './components/index.js';
 
 function Panel() {
-  const [enabledToolGroups, setEnabledToolGroups] = useState<EnabledToolGroups>({});
-  const [registry, setRegistry] = useState<ToolRegistryResult[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Initialize hooks
+  const settingsHook = useSettings();
+  const registryHook = useToolRegistry();
+  const enabledToolsHook = useEnabledTools();
 
-  useEffect(() => {
-    (async () => {
-      const tools = await searchTools();
-      setRegistry(tools);
-
-      chrome.storage.local.get<{enabledToolGroups: EnabledToolGroups}>(['enabledToolGroups'], (result) => {
-        const storedGroups: EnabledToolGroups = result.enabledToolGroups || {};
-        setEnabledToolGroups(storedGroups);
-        setLoading(false);
-      });
-    })();
-  }, []);
-
-  const handleToggle = (entryId: string) => {
-    const isCurrentlyEnabled = enabledToolGroups[entryId] !== undefined;
-    let updatedGroups: EnabledToolGroups;
-
-    if (!isCurrentlyEnabled) {
-      const toolGroup = registry.find(entry => entry.id === entryId);
-
-      if (!toolGroup) {
-        return;
-      }
-
-      const storedGroup: StoredToolGroup = {
-        id: toolGroup.id,
-        name: toolGroup.name,
-        description: toolGroup.description,
-        domains: toolGroup.domains,
-        tools: toolGroup.tools.map(tool => ({
-          source: tool.source,
-          pathPattern: tool.pathPattern
-        }))
-      };
-      updatedGroups = {
-        ...enabledToolGroups,
-        [entryId]: storedGroup
-      };
-    } else {
-      const {[entryId]: _, ...rest} = enabledToolGroups;
-      updatedGroups = rest;
+  const browsedToolsHook = useBrowsedTools({
+    onRefresh: async () => {
+      await registryHook.loadRegistry(settingsHook.settings.packageSources);
     }
+  });
 
-    setEnabledToolGroups(updatedGroups);
-    chrome.storage.local.set({enabledToolGroups: updatedGroups});
-  };
+  const sourcesHook = useSources({
+    settings: settingsHook.settings,
+    saveSettings: settingsHook.saveSettings,
+    loadRegistry: registryHook.loadRegistry,
+    clearSourceError: registryHook.clearSourceError,
+    setSourceError: registryHook.setSourceError,
+    removeFromRegistries: registryHook.removeFromRegistries,
+    updateSourceInRegistry: registryHook.updateSourceInRegistry,
+    moveToActive: registryHook.moveToActive,
+    moveToInactive: registryHook.moveToInactive,
+    inactiveRegistry: registryHook.inactiveRegistry,
+    activeRegistry: registryHook.activeRegistry,
+    browsedTools: browsedToolsHook.browsedTools,
+    onRefreshBrowsedTools: browsedToolsHook.handleRefreshBrowsedTools,
+    onAutoEnable: enabledToolsHook.autoEnableTools
+  });
 
-  if (loading) {
+  const searchHook = useToolSearch();
+  const expandableHook = useExpandableUI(registryHook.activeRegistry);
+  const browserControlStatus = useBrowserControlStatus();
+
+  // Initial load - coordinate settings and registry
+  useEffect(() => {
+    if (!settingsHook.loading) {
+      registryHook.loadRegistry(settingsHook.settings.packageSources);
+    }
+  }, [settingsHook.loading]);
+
+  // Filter registry based on search
+  const filteredRegistry = searchHook.filterRegistry(registryHook.activeRegistry);
+
+  // Loading state
+  if (settingsHook.loading) {
     return (
       <div class="panel">
         <div class="panel-header">
@@ -74,33 +82,64 @@ function Panel() {
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
       <div class="panel-content">
-        <p>Enable or disable tool sets:</p>
+        {/* Package Sources Section */}
+        <div class="settings-section">
+          <h2 class="section-title">Sources</h2>
+          <SourceList
+            sources={settingsHook.settings.packageSources}
+            sourceErrors={registryHook.sourceErrors}
+            refreshingSource={sourcesHook.refreshingSource}
+            isBrowsing={browsedToolsHook.isBrowsing}
+            browsedTools={browsedToolsHook.browsedTools}
+            browsingError={browsedToolsHook.browsingError}
+            activeRegistry={registryHook.activeRegistry}
+            inactiveRegistry={registryHook.inactiveRegistry}
+            onSourceToggle={sourcesHook.handleSourceToggle}
+            onRefreshSource={sourcesHook.handleRefreshSource}
+            onRemoveSource={sourcesHook.handleRemoveSource}
+            onBrowseDirectory={browsedToolsHook.handleBrowseDirectory}
+            onRefreshBrowsedTools={browsedToolsHook.handleRefreshBrowsedTools}
+            onClearBrowsedTools={browsedToolsHook.handleClearBrowsedTools}
+            pollingEnabled={browsedToolsHook.pollingEnabled}
+            pollingError={browsedToolsHook.pollingError}
+            onPollingToggle={browsedToolsHook.handlePollingToggle}
+            onAutoEnableToggle={sourcesHook.handleAutoEnableToggle}
+          />
+          <AddSourceForm
+            newSourceUrl={sourcesHook.newSourceUrl}
+            onNewSourceUrlChange={sourcesHook.setNewSourceUrl}
+            addingSource={sourcesHook.addingSource}
+            addSourceError={sourcesHook.addSourceError}
+            onAddSource={sourcesHook.handleAddSource}
+            onClearError={sourcesHook.clearAddSourceError}
+          />
+        </div>
 
-        {registry.map((entry: ToolRegistryResult, index: number) => {
-          const isEnabled = enabledToolGroups[entry.id] !== undefined;
-          const toolCount = entry.tools.length;
+        {/* Browser Control MCP Server Section */}
+        <BrowserControlSection
+          enabled={settingsHook.browserControlEnabled}
+          connectedPorts={browserControlStatus.status.connectedPorts}
+          onToggle={settingsHook.handleBrowserControlToggle}
+        />
 
-          return (
-            <div key={index} class="registry-entry">
-              <div class="registry-row">
-                <div class="registry-info">
-                  <span class="registry-name">{entry.name}</span>
-                  <span class="registry-tool-count">
-                    {toolCount} tool{toolCount !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <label class="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={isEnabled}
-                    onChange={() => handleToggle(entry.id)}
-                  />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-          );
-        })}
+        {/* Tools Section */}
+        <ToolsSection
+          filteredRegistry={filteredRegistry}
+          searchQuery={searchHook.searchQuery}
+          onSearchChange={searchHook.setSearchQuery}
+          enabledTools={enabledToolsHook.enabledTools}
+          fetchingIds={enabledToolsHook.fetchingIds}
+          fetchErrors={enabledToolsHook.fetchErrors}
+          expandedGroups={expandableHook.expandedGroups}
+          expandedDescriptions={expandableHook.expandedDescriptions}
+          overflowingDescriptions={expandableHook.overflowingDescriptions}
+          descriptionRefs={expandableHook.descriptionRefs}
+          getGroupToggleState={enabledToolsHook.getGroupToggleState}
+          onToggleGroup={expandableHook.toggleGroup}
+          onGroupToggle={enabledToolsHook.handleGroupToggle}
+          onToolToggle={enabledToolsHook.handleToolToggle}
+          onToggleDescription={expandableHook.toggleDescription}
+        />
       </div>
     </div>
   );
