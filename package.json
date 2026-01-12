@@ -9,15 +9,15 @@
     "build": "npm run --workspaces --if-present build",
     "test": "vitest run",
     "lint": "npm run lint:format && npm run lint:js",
-    "format": "prettier --write \"packages/*/{test,src}/**/*.ts\"",
-    "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\"",
+    "format": "prettier --write \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
+    "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
     "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\""
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@vitest/browser-playwright": "^4.0.16",
     "eslint": "^9.39.2",
     "globals": "^17.0.0",
-    "@vitest/browser": "^4.0.16",
     "playwright": "^1.57.0",
     "prettier": "^3.7.4",
     "typescript-eslint": "^8.51.0",
