@@ -5,8 +5,7 @@ import type {
   ManifestCache,
   ManifestCacheEntry,
   ToolRegistryResult,
-  GroupedToolRegistryResult,
-  BrowsedToolsData
+  GroupedToolRegistryResult
 } from './shared.js';
 
 export type {ToolRegistryResult, GroupedToolRegistryResult};
@@ -34,97 +33,6 @@ function extractFilters(filters: RemoteTool['filters']): {
     domains: domainFilter?.domains || [],
     pathPatterns: pathFilter?.patterns || []
   };
-}
-
-/**
- * Convert BrowsedToolsData to RemoteManifest format
- */
-function convertBrowsedToManifest(
-  browsedTools: BrowsedToolsData
-): RemoteManifest {
-  return browsedTools.groups.map((group) => ({
-    name: group.name,
-    description: group.description,
-    tools: group.tools
-      .map((toolId) => browsedTools.tools.find((t) => t.id === toolId))
-      .filter((t): t is NonNullable<typeof t> => t !== undefined)
-      .map((tool) => ({
-        id: tool.id,
-        description: tool.description,
-        filters: tool.filters,
-        groupId: tool.groupId
-      }))
-  }));
-}
-
-async function fetchLocalManifest(): Promise<RemoteManifest> {
-  // Check for browsed tools first
-  const stored = await chrome.storage.local.get<{
-    browsedTools: BrowsedToolsData;
-  }>(['browsedTools']);
-  if (stored.browsedTools) {
-    return convertBrowsedToManifest(stored.browsedTools);
-  }
-
-  // Fall back to bundled local-tools
-  const groupsUrl = chrome.runtime.getURL('local-tools/groups.json');
-  const groupsResponse = await fetch(groupsUrl);
-  if (!groupsResponse.ok) {
-    // No local tools is a valid state - return empty manifest
-    return [];
-  }
-  const groupsData: ToolGroupResponse[] = await groupsResponse.json();
-
-  const allToolNames = new Set(groupsData.flatMap((g) => g.tools));
-  const toolMap = new Map<string, RemoteTool>();
-
-  await Promise.all(
-    Array.from(allToolNames).map(async (name) => {
-      const metaUrl = chrome.runtime.getURL(`local-tools/tools/${name}.json`);
-      const res = await fetch(metaUrl);
-      if (!res.ok) {
-        throw new Error(`Local tool ${name} metadata not found`);
-      }
-      toolMap.set(name, await res.json());
-    })
-  );
-
-  return groupsData.map((group) => {
-    const tools: RemoteTool[] = [];
-    for (const name of group.tools) {
-      const tool = toolMap.get(name);
-      if (tool) {
-        tools.push(tool);
-      }
-    }
-    return {
-      name: group.name,
-      description: group.description,
-      tools
-    };
-  });
-}
-
-export async function fetchLocalToolSource(toolName: string): Promise<string> {
-  // Check for browsed tools first
-  const stored = await chrome.storage.local.get<{
-    browsedTools: BrowsedToolsData;
-  }>(['browsedTools']);
-  if (stored.browsedTools) {
-    const tool = stored.browsedTools.tools.find((t) => t.id === toolName);
-    if (tool) {
-      return tool.source;
-    }
-    throw new Error(`Browsed tool source not found: ${toolName}`);
-  }
-
-  // Fall back to bundled local-tools
-  const url = chrome.runtime.getURL(`local-tools/tools/${toolName}.js`);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Local tool source not found: ${toolName}`);
-  }
-  return response.text();
 }
 
 async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
@@ -222,32 +130,6 @@ export async function searchToolsGrouped(
   // Fetch all manifests in parallel
   const manifestPromises = sources.map(async (source) => {
     try {
-      if (source.type === 'local') {
-        const manifest = await fetchLocalManifest();
-        return {
-          sourceUrl: 'local',
-          baseUrl: 'local',
-          groups: manifest.map((group) => {
-            return {
-              name: group.name,
-              description: group.description,
-              tools: group.tools.map((tool) => {
-                const {domains, pathPatterns} = extractFilters(tool.filters);
-                return {
-                  name: tool.id,
-                  description: tool.description,
-                  domains,
-                  pathPatterns,
-                  sourceUrl: 'local',
-                  baseUrl: 'local',
-                  groupName: group.name
-                };
-              })
-            };
-          })
-        } as GroupedToolRegistryResult;
-      }
-
       const baseUrl = source.url.replace(/\/$/, '');
       const manifest = await getManifestWithCache(source.url, cacheMode);
       return {
@@ -275,10 +157,9 @@ export async function searchToolsGrouped(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to fetch';
-      const baseUrl =
-        source.type === 'local' ? 'local' : source.url.replace(/\/$/, '');
+      const baseUrl = source.url.replace(/\/$/, '');
       return {
-        sourceUrl: source.type === 'local' ? 'local' : source.url,
+        sourceUrl: source.url,
         baseUrl,
         groups: [],
         error: message

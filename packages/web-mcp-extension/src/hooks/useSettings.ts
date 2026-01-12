@@ -1,13 +1,29 @@
 import {useState, useEffect} from 'preact/hooks';
-import type {WebMCPSettings} from '../shared.js';
-import {DEFAULT_SETTINGS, LOCAL_SOURCE} from '../shared.js';
+import type {WebMCPSettings, PackageSource} from '../shared.js';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_PACKAGE_SOURCE,
+  LOCALHOST_SOURCE
+} from '../shared.js';
+
+// Helper function to derive sources array from settings
+function deriveSourcesFromSettings(settings: WebMCPSettings): PackageSource[] {
+  const sources = [DEFAULT_PACKAGE_SOURCE];
+  if (settings.localToolsEnabled) {
+    sources.push(LOCALHOST_SOURCE);
+  }
+  return sources;
+}
 
 export interface UseSettingsReturn {
   settings: WebMCPSettings;
   loading: boolean;
   browserControlEnabled: boolean;
+  localToolsEnabled: boolean;
+  derivedSources: PackageSource[];
   saveSettings: (newSettings: WebMCPSettings) => Promise<void>;
   handleBrowserControlToggle: (enabled: boolean) => Promise<void>;
+  handleLocalToolsToggle: (enabled: boolean) => Promise<void>;
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -21,26 +37,7 @@ export function useSettings(): UseSettingsReturn {
       }>(['webmcpSettings']);
 
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
-
-      // Ensure LOCAL_SOURCE is always present and up-to-date
-      const storedLocalSource = storedSettings.packageSources.find(
-        (s) => s.type === 'local' || s.url === 'local'
-      );
-      const nonLocalSources = storedSettings.packageSources.filter(
-        (s) => s.type !== 'local' && s.url !== 'local'
-      );
-      // Preserve user's settings, use LOCAL_SOURCE for base fields
-      const localSource = {
-        ...LOCAL_SOURCE,
-        enabled: storedLocalSource?.enabled ?? LOCAL_SOURCE.enabled,
-        autoEnable: storedLocalSource?.autoEnable
-      };
-      const mergedSettings: WebMCPSettings = {
-        ...storedSettings,
-        packageSources: [localSource, ...nonLocalSources]
-      };
-
-      setSettings(mergedSettings);
+      setSettings(storedSettings);
       setLoading(false);
     })();
   }, []);
@@ -51,6 +48,8 @@ export function useSettings(): UseSettingsReturn {
   };
 
   const browserControlEnabled = settings.browserControlEnabled ?? false;
+  const localToolsEnabled = settings.localToolsEnabled ?? false;
+  const derivedSources = deriveSourcesFromSettings(settings);
 
   const handleBrowserControlToggle = async (enabled: boolean) => {
     const newSettings = {...settings, browserControlEnabled: enabled};
@@ -63,11 +62,19 @@ export function useSettings(): UseSettingsReturn {
     });
   };
 
+  const handleLocalToolsToggle = async (enabled: boolean) => {
+    const newSettings = {...settings, localToolsEnabled: enabled};
+    await saveSettings(newSettings);
+  };
+
   return {
     settings,
     loading,
     browserControlEnabled,
+    localToolsEnabled,
+    derivedSources,
     saveSettings,
-    handleBrowserControlToggle
+    handleBrowserControlToggle,
+    handleLocalToolsToggle
   };
 }
