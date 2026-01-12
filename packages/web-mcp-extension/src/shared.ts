@@ -207,25 +207,96 @@ export interface BrowserControlTool {
 // Messages from extension to MCP server
 export type ExtensionMessage =
   | {type: typeof ExtensionMessageType.PING}
-  | {type: typeof ExtensionMessageType.CONNECTED; sessionId?: string; browser: {name: string; version: string}; tabs: BrowserControlTabInfo[]}
+  | {
+      type: typeof ExtensionMessageType.CONNECTED;
+      sessionId?: string;
+      browser: {name: string; version: string};
+      tabs: BrowserControlTabInfo[];
+    }
   | {type: typeof ExtensionMessageType.DISCONNECTED; sessionId?: string}
-  | {type: typeof ExtensionMessageType.TAB_CREATED; sessionId?: string; tab: BrowserControlTabInfo; requestId?: string}
-  | {type: typeof ExtensionMessageType.TAB_UPDATED; sessionId?: string; tab: BrowserControlTabInfo}
-  | {type: typeof ExtensionMessageType.TAB_CLOSED; sessionId?: string; tabId: number}
-  | {type: typeof ExtensionMessageType.TAB_FOCUSED; sessionId?: string; tabId: number; tools: BrowserControlTool[]; requestId?: string}
-  | {type: typeof ExtensionMessageType.TOOLS_CHANGED; sessionId?: string; tabId: number; tools: BrowserControlTool[]}
-  | {type: typeof ExtensionMessageType.TOOL_RESULT; sessionId?: string; callId: string; result: unknown; error?: string}
-  | {type: typeof ExtensionMessageType.TOOLS_DISCOVERED; sessionId?: string; callId: string; tabId: number; tools: BrowserControlTool[]};
+  | {
+      type: typeof ExtensionMessageType.TAB_CREATED;
+      sessionId?: string;
+      tab: BrowserControlTabInfo;
+      requestId?: string;
+    }
+  | {
+      type: typeof ExtensionMessageType.TAB_UPDATED;
+      sessionId?: string;
+      tab: BrowserControlTabInfo;
+    }
+  | {
+      type: typeof ExtensionMessageType.TAB_CLOSED;
+      sessionId?: string;
+      tabId: number;
+    }
+  | {
+      type: typeof ExtensionMessageType.TAB_FOCUSED;
+      sessionId?: string;
+      tabId: number;
+      tools: BrowserControlTool[];
+      requestId?: string;
+    }
+  | {
+      type: typeof ExtensionMessageType.TOOLS_CHANGED;
+      sessionId?: string;
+      tabId: number;
+      tools: BrowserControlTool[];
+    }
+  | {
+      type: typeof ExtensionMessageType.TOOL_RESULT;
+      sessionId?: string;
+      callId: string;
+      result: unknown;
+      error?: string;
+    }
+  | {
+      type: typeof ExtensionMessageType.TOOLS_DISCOVERED;
+      sessionId?: string;
+      callId: string;
+      tabId: number;
+      tools: BrowserControlTool[];
+    };
 
 // Messages from MCP server to extension
 export type ServerMessage =
   | {type: typeof ServerMessageType.PONG}
-  | {type: typeof ServerMessageType.CONNECT; sessionId?: string; launch?: boolean}
-  | {type: typeof ServerMessageType.OPEN_TAB; sessionId?: string; url: string; focus: boolean; requestId?: string}
-  | {type: typeof ServerMessageType.FOCUS_TAB; sessionId?: string; tabId: number}
-  | {type: typeof ServerMessageType.CLOSE_TAB; sessionId?: string; tabId: number}
-  | {type: typeof ServerMessageType.CALL_TOOL; sessionId?: string; callId: string; tabId: number; toolName: string; args: Record<string, unknown>}
-  | {type: typeof ServerMessageType.DISCOVER_TOOLS; sessionId?: string; callId: string; tabId: number};
+  | {
+      type: typeof ServerMessageType.CONNECT;
+      sessionId?: string;
+      launch?: boolean;
+    }
+  | {
+      type: typeof ServerMessageType.OPEN_TAB;
+      sessionId?: string;
+      url: string;
+      focus: boolean;
+      requestId?: string;
+    }
+  | {
+      type: typeof ServerMessageType.FOCUS_TAB;
+      sessionId?: string;
+      tabId: number;
+    }
+  | {
+      type: typeof ServerMessageType.CLOSE_TAB;
+      sessionId?: string;
+      tabId: number;
+    }
+  | {
+      type: typeof ServerMessageType.CALL_TOOL;
+      sessionId?: string;
+      callId: string;
+      tabId: number;
+      toolName: string;
+      args: Record<string, unknown>;
+    }
+  | {
+      type: typeof ServerMessageType.DISCOVER_TOOLS;
+      sessionId?: string;
+      callId: string;
+      tabId: number;
+    };
 
 // Status for UI display
 export interface BrowserControlStatus {

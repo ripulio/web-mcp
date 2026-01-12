@@ -22,7 +22,9 @@ interface ToolToInject {
 // Per-tab state storage helpers (persisted to session storage to survive SW restarts)
 async function getTabState(tabId: number): Promise<TabToolState | null> {
   const key = `tabState:${tabId}`;
-  const result = await chrome.storage.session.get<{[key: string]: TabToolState}>(key);
+  const result = await chrome.storage.session.get<{
+    [key: string]: TabToolState;
+  }>(key);
   return result[key] ?? null;
 }
 
@@ -93,7 +95,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'WEBMCP_INJECT_TOOLS') {
     const tools = message.tools as ToolToInject[];
     const toolNames = tools.map((t) => t.toolId);
-    console.log(`[WebMCP] Injecting ${tools.length} tools into tab ${tabId}:`, toolNames);
+    console.log(
+      `[WebMCP] Injecting ${tools.length} tools into tab ${tabId}:`,
+      toolNames
+    );
 
     // Initialize or update tab state with injected tools
     (async () => {
@@ -148,7 +153,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'WEBMCP_TOOL_INVOCATION_END') {
     getTabState(tabId).then(async (state) => {
       if (state) {
-        const invocation = state.invocations.find((i) => i.id === message.invocationId);
+        const invocation = state.invocations.find(
+          (i) => i.id === message.invocationId
+        );
         if (invocation) {
           invocation.result = message.result;
           invocation.completedAt = Date.now();
@@ -185,7 +192,10 @@ async function injectTools(tabId: number, tools: ToolToInject[]) {
 
   for (const tool of tools) {
     // Strip "export const varName = " from source if present
-    const cleanedSource = tool.source.replace(/^export\s+const\s+\w+\s*=\s*/, '');
+    const cleanedSource = tool.source.replace(
+      /^export\s+const\s+\w+\s*=\s*/,
+      ''
+    );
 
     const wrappedSource = `
 (() => {
@@ -230,9 +240,9 @@ let browserControlEnabled = false;
 
 // Initialize browser control based on stored settings
 async function initBrowserControl(): Promise<void> {
-  const result = await chrome.storage.local.get<{webmcpSettings: WebMCPSettings}>([
-    'webmcpSettings'
-  ]);
+  const result = await chrome.storage.local.get<{
+    webmcpSettings: WebMCPSettings;
+  }>(['webmcpSettings']);
   const settings = result.webmcpSettings || DEFAULT_SETTINGS;
 
   if (settings.browserControlEnabled) {
@@ -272,7 +282,7 @@ async function isPortResponding(port: number): Promise<boolean> {
     const timeoutId = setTimeout(() => controller.abort(), 100);
     await fetch(`http://localhost:${port}`, {
       signal: controller.signal,
-      mode: 'no-cors',
+      mode: 'no-cors'
     });
     clearTimeout(timeoutId);
     return true;
@@ -354,7 +364,9 @@ function stopKeepalive(): void {
 function sendToPort(port: number, message: ExtensionMessage): void {
   const ws = wsConnections.get(port);
   if (!ws || ws.readyState !== WebSocket.OPEN) {
-    console.error(`${BC_LOG_PREFIX} Cannot send to port ${port} - not connected`);
+    console.error(
+      `${BC_LOG_PREFIX} Cannot send to port ${port} - not connected`
+    );
     return;
   }
   ws.send(JSON.stringify(message));
@@ -449,9 +461,11 @@ async function handleConnect(
     tabs
       .filter((tab) => tab.id !== undefined)
       .map(async (tab) => ({
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         id: tab.id!,
         title: tab.title || '',
         url: tab.url || '',
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         tools: await discoverPageTools(tab.id!)
       }))
   );
@@ -494,7 +508,10 @@ async function handleOpenTab(
         message: {type?: string},
         sender: chrome.runtime.MessageSender
       ) => {
-        if (message.type === 'WEBMCP_TOOLS_READY' && sender.tab?.id === tab.id) {
+        if (
+          message.type === 'WEBMCP_TOOLS_READY' &&
+          sender.tab?.id === tab.id
+        ) {
           chrome.runtime.onMessage.removeListener(listener);
           resolve();
         }
@@ -573,7 +590,10 @@ async function handleCallTool(
   args: Record<string, unknown>,
   sessionId?: string
 ): Promise<void> {
-  console.log(`${BC_LOG_PREFIX} Calling tool "${toolName}" on tab ${tabId}`, args);
+  console.log(
+    `${BC_LOG_PREFIX} Calling tool "${toolName}" on tab ${tabId}`,
+    args
+  );
 
   try {
     const code = `

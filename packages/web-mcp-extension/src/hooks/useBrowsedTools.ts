@@ -1,10 +1,17 @@
 import {useState, useEffect} from 'preact/hooks';
-import type {BrowsedToolsData, EnabledTools, ToolCache, CachedToolData} from '../shared.js';
+import type {
+  BrowsedToolsData,
+  EnabledTools,
+  ToolCache,
+  CachedToolData
+} from '../shared.js';
 import {parseToolDirectory} from '../directory-parser.js';
 import {useDirectoryPolling} from './useDirectoryPolling.js';
 
 // Helper to extract domains and pathPatterns from filters
-function extractFilters(filters: {type: string; domains?: string[]; patterns?: string[]}[]): {
+function extractFilters(
+  filters: {type: string; domains?: string[]; patterns?: string[]}[]
+): {
   domains: string[];
   pathPatterns: string[];
 } {
@@ -20,7 +27,9 @@ function extractFilters(filters: {type: string; domains?: string[]; patterns?: s
  * Sync enabled local tools from browsedTools to toolCache.
  * This ensures toolCache always has the latest source/metadata after updates.
  */
-async function syncLocalToolsToCache(browsedTools: BrowsedToolsData): Promise<void> {
+async function syncLocalToolsToCache(
+  browsedTools: BrowsedToolsData
+): Promise<void> {
   const result = await chrome.storage.local.get<{
     enabledToolGroups: EnabledTools;
     toolCache: ToolCache;
@@ -31,8 +40,8 @@ async function syncLocalToolsToCache(browsedTools: BrowsedToolsData): Promise<vo
 
   // Find enabled local tools
   const enabledLocalToolNames = Object.values(enabledTools)
-    .filter(t => t.sourceUrl === 'local')
-    .map(t => t.name);
+    .filter((t) => t.sourceUrl === 'local')
+    .map((t) => t.name);
 
   if (enabledLocalToolNames.length === 0) {
     return; // No local tools enabled, nothing to sync
@@ -45,7 +54,7 @@ async function syncLocalToolsToCache(browsedTools: BrowsedToolsData): Promise<vo
 
   // Sync each enabled local tool
   for (const toolName of enabledLocalToolNames) {
-    const browsedTool = browsedTools.tools.find(t => t.id === toolName);
+    const browsedTool = browsedTools.tools.find((t) => t.id === toolName);
     if (browsedTool) {
       const {domains, pathPatterns} = extractFilters(browsedTool.filters);
       const toolData: CachedToolData = {

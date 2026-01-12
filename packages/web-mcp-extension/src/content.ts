@@ -1,4 +1,11 @@
-import type {EnabledTools, StoredTool, WebMCPSettings, ToolCache, BrowsedToolsData, BrowsedTool} from './shared.js';
+import type {
+  EnabledTools,
+  StoredTool,
+  WebMCPSettings,
+  ToolCache,
+  BrowsedToolsData,
+  BrowsedTool
+} from './shared.js';
 
 // Extract domains and pathPatterns from filters array (for legacy browsedTools fallback)
 function extractFilters(filters: BrowsedTool['filters']): {
@@ -90,7 +97,11 @@ let currentlyRegisteredTools = new Set<string>();
 
   // Storage changes - re-evaluate when tools, settings, or cache change
   chrome.storage.local.onChanged.addListener((changes) => {
-    if (changes.enabledToolGroups || changes.webmcpSettings || changes.toolCache) {
+    if (
+      changes.enabledToolGroups ||
+      changes.webmcpSettings ||
+      changes.toolCache
+    ) {
       evaluateAndInjectTools();
     }
   });
@@ -104,7 +115,13 @@ async function evaluateAndInjectTools() {
     // Legacy fallback storage (for migration)
     sourceCache: ToolCache;
     browsedTools: BrowsedToolsData;
-  }>(['enabledToolGroups', 'webmcpSettings', 'toolCache', 'sourceCache', 'browsedTools']);
+  }>([
+    'enabledToolGroups',
+    'webmcpSettings',
+    'toolCache',
+    'sourceCache',
+    'browsedTools'
+  ]);
   const enabledTools = result.enabledToolGroups || {};
   const settings = result.webmcpSettings;
   const toolCache = result.toolCache || {};
@@ -158,7 +175,9 @@ async function evaluateAndInjectTools() {
       // Fallback to legacy storage for migration
       if (toolRef.sourceUrl === 'local') {
         // Legacy local tools: look up from browsedTools
-        const browsedTool = legacyBrowsedTools?.tools.find(t => t.id === toolRef.name);
+        const browsedTool = legacyBrowsedTools?.tools.find(
+          (t) => t.id === toolRef.name
+        );
         if (browsedTool) {
           const {domains, pathPatterns} = extractFilters(browsedTool.filters);
           toolData = {
@@ -169,7 +188,8 @@ async function evaluateAndInjectTools() {
         }
       } else {
         // Legacy remote tools: look up from sourceCache
-        const legacyCached = legacySourceCache[toolRef.sourceUrl]?.[toolRef.name];
+        const legacyCached =
+          legacySourceCache[toolRef.sourceUrl]?.[toolRef.name];
         if (legacyCached) {
           toolData = {
             source: legacyCached.source,
@@ -181,7 +201,9 @@ async function evaluateAndInjectTools() {
     }
 
     if (!toolData) {
-      console.log(`[WebMCP] Tool "${toolRef.name}" skipped: tool data not found in source storage`);
+      console.log(
+        `[WebMCP] Tool "${toolRef.name}" skipped: tool data not found in source storage`
+      );
       continue;
     }
 
@@ -211,10 +233,14 @@ async function evaluateAndInjectTools() {
     // Use tool name as the identifier
     const toolId = toolRef.name;
     if (!currentlyRegisteredTools.has(toolId)) {
-      console.log(`[WebMCP] Tool "${toolRef.name}" will be injected (domain and path match)`);
+      console.log(
+        `[WebMCP] Tool "${toolRef.name}" will be injected (domain and path match)`
+      );
       toolsToInject.push({toolId, source: toolData.source});
     } else {
-      console.log(`[WebMCP] Tool "${toolRef.name}" already registered, skipping`);
+      console.log(
+        `[WebMCP] Tool "${toolRef.name}" already registered, skipping`
+      );
     }
     newToolNames.add(toolId);
   }

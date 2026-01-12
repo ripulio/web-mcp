@@ -28,7 +28,10 @@ export function useBrowserControlStatus(): UseBrowserControlStatusReturn {
     refresh();
 
     // Listen for status updates from background
-    const listener = (message: {type: string; status?: BrowserControlStatus}) => {
+    const listener = (message: {
+      type: string;
+      status?: BrowserControlStatus;
+    }) => {
       if (message.type === 'BROWSER_CONTROL_STATUS_UPDATE' && message.status) {
         setStatus(message.status);
       }
