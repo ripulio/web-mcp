@@ -49,7 +49,9 @@ function isToolMeta(data: unknown): data is ToolMetaFile {
  *    -> "lib/tools/amazon/amazon_search.js"
  */
 function getSourcePath(metaPath: string): string {
-  return metaPath.replace('src/tools/', 'lib/tools/').replace('.meta.json', '.js');
+  return metaPath
+    .replace('src/tools/', 'lib/tools/')
+    .replace('.meta.json', '.js');
 }
 
 /**
@@ -94,11 +96,17 @@ export async function parseToolDirectory(
   const fileMap = await collectFiles(dirHandle, '');
 
   // Check for required directories
-  const hasSrcTools = Array.from(fileMap.keys()).some((path) => path.startsWith('src/tools/'));
-  const hasLibTools = Array.from(fileMap.keys()).some((path) => path.startsWith('lib/tools/'));
+  const hasSrcTools = Array.from(fileMap.keys()).some((path) =>
+    path.startsWith('src/tools/')
+  );
+  const hasLibTools = Array.from(fileMap.keys()).some((path) =>
+    path.startsWith('lib/tools/')
+  );
 
   if (!hasSrcTools) {
-    throw new Error('No tools directory found. Expected src/tools/ in the selected directory.');
+    throw new Error(
+      'No tools directory found. Expected src/tools/ in the selected directory.'
+    );
   }
 
   if (!hasLibTools) {

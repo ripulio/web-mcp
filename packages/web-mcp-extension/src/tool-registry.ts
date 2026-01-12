@@ -39,7 +39,9 @@ function extractFilters(filters: RemoteTool['filters']): {
 /**
  * Convert BrowsedToolsData to RemoteManifest format
  */
-function convertBrowsedToManifest(browsedTools: BrowsedToolsData): RemoteManifest {
+function convertBrowsedToManifest(
+  browsedTools: BrowsedToolsData
+): RemoteManifest {
   return browsedTools.groups.map((group) => ({
     name: group.name,
     description: group.description,
@@ -57,9 +59,9 @@ function convertBrowsedToManifest(browsedTools: BrowsedToolsData): RemoteManifes
 
 async function fetchLocalManifest(): Promise<RemoteManifest> {
   // Check for browsed tools first
-  const stored = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>([
-    'browsedTools'
-  ]);
+  const stored = await chrome.storage.local.get<{
+    browsedTools: BrowsedToolsData;
+  }>(['browsedTools']);
   if (stored.browsedTools) {
     return convertBrowsedToManifest(stored.browsedTools);
   }
@@ -87,18 +89,27 @@ async function fetchLocalManifest(): Promise<RemoteManifest> {
     })
   );
 
-  return groupsData.map((group) => ({
-    name: group.name,
-    description: group.description,
-    tools: group.tools.map((name) => toolMap.get(name)!)
-  }));
+  return groupsData.map((group) => {
+    const tools: RemoteTool[] = [];
+    for (const name of group.tools) {
+      const tool = toolMap.get(name);
+      if (tool) {
+        tools.push(tool);
+      }
+    }
+    return {
+      name: group.name,
+      description: group.description,
+      tools
+    };
+  });
 }
 
 export async function fetchLocalToolSource(toolName: string): Promise<string> {
   // Check for browsed tools first
-  const stored = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>([
-    'browsedTools'
-  ]);
+  const stored = await chrome.storage.local.get<{
+    browsedTools: BrowsedToolsData;
+  }>(['browsedTools']);
   if (stored.browsedTools) {
     const tool = stored.browsedTools.tools.find((t) => t.id === toolName);
     if (tool) {
@@ -146,11 +157,20 @@ async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
   );
 
   // Build grouped manifest
-  return groupsData.map((group) => ({
-    name: group.name,
-    description: group.description,
-    tools: group.tools.map((name) => toolMap.get(name)!)
-  }));
+  return groupsData.map((group) => {
+    const tools: RemoteTool[] = [];
+    for (const name of group.tools) {
+      const tool = toolMap.get(name);
+      if (tool) {
+        tools.push(tool);
+      }
+    }
+    return {
+      name: group.name,
+      description: group.description,
+      tools
+    };
+  });
 }
 
 function getCachedManifest(
@@ -253,8 +273,10 @@ export async function searchToolsGrouped(
         })
       } as GroupedToolRegistryResult;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch';
-      const baseUrl = source.type === 'local' ? 'local' : source.url.replace(/\/$/, '');
+      const message =
+        error instanceof Error ? error.message : 'Failed to fetch';
+      const baseUrl =
+        source.type === 'local' ? 'local' : source.url.replace(/\/$/, '');
       return {
         sourceUrl: source.type === 'local' ? 'local' : source.url,
         baseUrl,
@@ -313,7 +335,12 @@ export async function fetchToolSource(
 export async function refreshToolCache(
   sourceUrl: string,
   baseUrl: string,
-  toolsToRefresh: Array<{name: string; domains: string[]; pathPatterns: string[]; description: string}>
+  toolsToRefresh: Array<{
+    name: string;
+    domains: string[];
+    pathPatterns: string[];
+    description: string;
+  }>
 ): Promise<void> {
   if (toolsToRefresh.length === 0) return;
 
@@ -326,7 +353,9 @@ export async function refreshToolCache(
   );
 
   // Update toolCache with full tool data
-  const cacheResult = await chrome.storage.local.get<{toolCache: import('./shared.js').ToolCache}>(['toolCache']);
+  const cacheResult = await chrome.storage.local.get<{
+    toolCache: import('./shared.js').ToolCache;
+  }>(['toolCache']);
   const toolCache = cacheResult.toolCache || {};
   if (!toolCache[sourceUrl]) {
     toolCache[sourceUrl] = {};

@@ -7,7 +7,11 @@ import type {
   EnabledTools
 } from '../shared.js';
 import {LOCAL_SOURCE} from '../shared.js';
-import {searchToolsGrouped, validateSource, refreshToolCache} from '../tool-registry.js';
+import {
+  searchToolsGrouped,
+  validateSource,
+  refreshToolCache
+} from '../tool-registry.js';
 
 export interface UseSourcesOptions {
   settings: WebMCPSettings;
@@ -27,7 +31,11 @@ export interface UseSourcesOptions {
   activeRegistry: GroupedToolRegistryResult[];
   browsedTools: BrowsedToolsData | null;
   onRefreshBrowsedTools: () => Promise<void>;
-  onAutoEnable?: (sourceUrl: string, registry: GroupedToolRegistryResult, baseUrl: string) => Promise<void>;
+  onAutoEnable?: (
+    sourceUrl: string,
+    registry: GroupedToolRegistryResult,
+    baseUrl: string
+  ) => Promise<void>;
 }
 
 export interface UseSourcesReturn {
@@ -102,19 +110,21 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
     if (!isLocal && sourceResult) {
       // Refresh source cache for enabled tools from this source
       // Use fresh metadata from the manifest we just fetched
-      const storageResult = await chrome.storage.local.get<{enabledToolGroups: EnabledTools}>(['enabledToolGroups']);
+      const storageResult = await chrome.storage.local.get<{
+        enabledToolGroups: EnabledTools;
+      }>(['enabledToolGroups']);
       const enabledTools = storageResult.enabledToolGroups || {};
       const enabledToolNames = new Set(
         Object.values(enabledTools)
-          .filter(tool => tool.sourceUrl === url)
-          .map(tool => tool.name)
+          .filter((tool) => tool.sourceUrl === url)
+          .map((tool) => tool.name)
       );
 
       // Find enabled tools in the refreshed manifest and get their full metadata
-      const toolsToRefresh = sourceResult.groups.flatMap(group =>
+      const toolsToRefresh = sourceResult.groups.flatMap((group) =>
         group.tools
-          .filter(tool => enabledToolNames.has(tool.name))
-          .map(tool => ({
+          .filter((tool) => enabledToolNames.has(tool.name))
+          .map((tool) => ({
             name: tool.name,
             domains: tool.domains,
             pathPatterns: tool.pathPatterns,

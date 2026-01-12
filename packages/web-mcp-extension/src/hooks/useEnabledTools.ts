@@ -14,7 +14,9 @@ import type {
 import {fetchToolSource} from '../tool-registry.js';
 
 // Helper to extract domains and pathPatterns from browsedTools filters
-function extractFilters(filters: {type: string; domains?: string[]; patterns?: string[]}[]): {
+function extractFilters(
+  filters: {type: string; domains?: string[]; patterns?: string[]}[]
+): {
   domains: string[];
   pathPatterns: string[];
 } {
@@ -116,8 +118,12 @@ export function useEnabledTools(): UseEnabledToolsReturn {
 
       if (isLocal) {
         // Local tools: get data from browsedTools
-        const browsedResult = await chrome.storage.local.get<{browsedTools: BrowsedToolsData}>(['browsedTools']);
-        const browsedTool = browsedResult.browsedTools?.tools.find(t => t.id === entry.name);
+        const browsedResult = await chrome.storage.local.get<{
+          browsedTools: BrowsedToolsData;
+        }>(['browsedTools']);
+        const browsedTool = browsedResult.browsedTools?.tools.find(
+          (t) => t.id === entry.name
+        );
         if (!browsedTool) {
           throw new Error('Tool not found in browsed tools');
         }
@@ -140,7 +146,9 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       }
 
       // Store in unified toolCache
-      const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache}>(['toolCache']);
+      const cacheResult = await chrome.storage.local.get<{
+        toolCache: ToolCache;
+      }>(['toolCache']);
       const toolCache = cacheResult.toolCache || {};
       if (!toolCache[entry.sourceUrl]) {
         toolCache[entry.sourceUrl] = {};
@@ -208,7 +216,10 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       });
 
       // Get tool data and store in unified toolCache
-      const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache; browsedTools: BrowsedToolsData}>(['toolCache', 'browsedTools']);
+      const cacheResult = await chrome.storage.local.get<{
+        toolCache: ToolCache;
+        browsedTools: BrowsedToolsData;
+      }>(['toolCache', 'browsedTools']);
       const toolCache = cacheResult.toolCache || {};
       if (!toolCache[sourceUrl]) {
         toolCache[sourceUrl] = {};
@@ -219,7 +230,9 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         const browsedTools = cacheResult.browsedTools;
         for (const tool of toolsToEnable) {
           const compositeId = `${sourceUrl}:${tool.name}`;
-          const browsedTool = browsedTools?.tools.find(t => t.id === tool.name);
+          const browsedTool = browsedTools?.tools.find(
+            (t) => t.id === tool.name
+          );
           if (browsedTool) {
             const {domains, pathPatterns} = extractFilters(browsedTool.filters);
             toolCache[sourceUrl][tool.name] = {
@@ -277,10 +290,16 @@ export function useEnabledTools(): UseEnabledToolsReturn {
 
       // Remove tools from disabledTools and group from disabledGroups
       const groupId = `${sourceUrl}:${group.name}`;
-      const updatedDisabledTools = {...disabledTools};
+      const updatedDisabledTools: DisabledTools = {};
+      const toolsToRemove: string[] = [];
       for (const tool of group.tools) {
         const compositeId = `${sourceUrl}:${tool.name}`;
-        delete updatedDisabledTools[compositeId];
+        toolsToRemove.push(compositeId);
+      }
+      for (const [key, value] of Object.entries(disabledTools)) {
+        if (!toolsToRemove.includes(key)) {
+          updatedDisabledTools[key] = value;
+        }
       }
       const {[groupId]: _, ...updatedDisabledGroups} = disabledGroups;
 
@@ -298,12 +317,21 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     } else {
       // Disable all tools in group - add to disabledGroups
       const groupId = `${sourceUrl}:${group.name}`;
-      const updatedEnabledTools = {...enabledTools};
+      const updatedEnabledTools: EnabledTools = {};
+      const toolsToRemove: string[] = [];
       for (const tool of group.tools) {
         const compositeId = `${sourceUrl}:${tool.name}`;
-        delete updatedEnabledTools[compositeId];
+        toolsToRemove.push(compositeId);
       }
-      const updatedDisabledGroups = {...disabledGroups, [groupId]: true as const};
+      for (const [key, value] of Object.entries(enabledTools)) {
+        if (!toolsToRemove.includes(key)) {
+          updatedEnabledTools[key] = value;
+        }
+      }
+      const updatedDisabledGroups = {
+        ...disabledGroups,
+        [groupId]: true as const
+      };
 
       setEnabledTools(updatedEnabledTools);
       setDisabledGroups(updatedDisabledGroups);
@@ -350,7 +378,10 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     });
 
     // Get tool data and store in unified toolCache
-    const cacheResult = await chrome.storage.local.get<{toolCache: ToolCache; browsedTools: BrowsedToolsData}>(['toolCache', 'browsedTools']);
+    const cacheResult = await chrome.storage.local.get<{
+      toolCache: ToolCache;
+      browsedTools: BrowsedToolsData;
+    }>(['toolCache', 'browsedTools']);
     const toolCache = cacheResult.toolCache || {};
     if (!toolCache[sourceUrl]) {
       toolCache[sourceUrl] = {};
@@ -360,7 +391,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
       const browsedTools = cacheResult.browsedTools;
       for (const tool of toolsToEnable) {
         const compositeId = `${sourceUrl}:${tool.name}`;
-        const browsedTool = browsedTools?.tools.find(t => t.id === tool.name);
+        const browsedTool = browsedTools?.tools.find((t) => t.id === tool.name);
         if (browsedTool) {
           const {domains, pathPatterns} = extractFilters(browsedTool.filters);
           toolCache[sourceUrl][tool.name] = {

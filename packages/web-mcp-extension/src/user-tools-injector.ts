@@ -12,6 +12,7 @@ function sanitizeForMessage(obj: unknown): unknown {
 
 // Wrap registerTool to intercept tool invocations
 // The polyfill guarantees navigator.modelContext exists after import
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 const modelContext = navigator.modelContext!;
 const originalRegisterTool = modelContext.registerTool.bind(modelContext);
 

@@ -1,8 +1,5 @@
 import {useState} from 'preact/hooks';
-import type {
-  PackageSource,
-  GroupedToolRegistryResult
-} from '../shared.js';
+import type {PackageSource, GroupedToolRegistryResult} from '../shared.js';
 import {searchToolsGrouped} from '../tool-registry.js';
 
 export interface UseToolRegistryReturn {
@@ -82,11 +79,10 @@ export function useToolRegistry(): UseToolRegistryReturn {
     setSourceErrors((prev) => ({...prev, [url]: error}));
   };
 
-  const moveToActive = (
-    sourceUrl: string,
-    data: GroupedToolRegistryResult
-  ) => {
-    setInactiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== sourceUrl));
+  const moveToActive = (sourceUrl: string, data: GroupedToolRegistryResult) => {
+    setInactiveRegistry((prev) =>
+      prev.filter((r) => r.sourceUrl !== sourceUrl)
+    );
     setActiveRegistry((prev) => [...prev, data]);
   };
 
