@@ -4,19 +4,25 @@ import type {
   WebMCPSettings,
   ToolCache,
   BrowsedToolsData,
-  BrowsedTool
+  BrowsedTool,
+  DomainFilter,
+  PathFilter,
+  QueryFilter
 } from './shared.js';
 
-// Extract domains and pathPatterns from filters array (for legacy browsedTools fallback)
+// Extract domains, pathPatterns, and queryParams from filters array (for legacy browsedTools fallback)
 function extractFilters(filters: BrowsedTool['filters']): {
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 } {
-  const domainFilter = filters.find((f) => f.type === 'domain');
-  const pathFilter = filters.find((f) => f.type === 'path');
+  const domainFilter = filters.find((f): f is DomainFilter => f.type === 'domain');
+  const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
+  const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
   return {
     domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.patterns || []
+    pathPatterns: pathFilter?.paths || [],
+    queryParams: queryFilter?.parameters || {}
   };
 }
 
@@ -25,6 +31,7 @@ interface ResolvedToolData {
   source: string;
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 }
 
 export interface ToolToInject {
@@ -169,7 +176,8 @@ async function evaluateAndInjectTools() {
       toolData = {
         source: cached.source,
         domains: cached.domains,
-        pathPatterns: cached.pathPatterns
+        pathPatterns: cached.pathPatterns,
+        queryParams: cached.queryParams || {}
       };
     } else {
       // Fallback to legacy storage for migration
@@ -179,11 +187,12 @@ async function evaluateAndInjectTools() {
           (t) => t.id === toolRef.name
         );
         if (browsedTool) {
-          const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+          const {domains, pathPatterns, queryParams} = extractFilters(browsedTool.filters);
           toolData = {
             source: browsedTool.source,
             domains,
-            pathPatterns
+            pathPatterns,
+            queryParams
           };
         }
       } else {
@@ -194,7 +203,8 @@ async function evaluateAndInjectTools() {
           toolData = {
             source: legacyCached.source,
             domains: legacyCached.domains,
-            pathPatterns: legacyCached.pathPatterns
+            pathPatterns: legacyCached.pathPatterns,
+            queryParams: legacyCached.queryParams || {}
           };
         }
       }
@@ -230,11 +240,26 @@ async function evaluateAndInjectTools() {
       continue;
     }
 
+    // Check if query parameters match (empty object means match all)
+    const queryParamKeys = Object.keys(toolData.queryParams);
+    const queryMatches =
+      queryParamKeys.length === 0 ||
+      queryParamKeys.every((key) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(key) === toolData.queryParams[key];
+      });
+    if (!queryMatches) {
+      console.log(
+        `[WebMCP] Tool "${toolRef.name}" skipped: query param mismatch (expected ${JSON.stringify(toolData.queryParams)}, got ${window.location.search})`
+      );
+      continue;
+    }
+
     // Use tool name as the identifier
     const toolId = toolRef.name;
     if (!currentlyRegisteredTools.has(toolId)) {
       console.log(
-        `[WebMCP] Tool "${toolRef.name}" will be injected (domain and path match)`
+        `[WebMCP] Tool "${toolRef.name}" will be injected (domain, path, and query match)`
       );
       toolsToInject.push({toolId, source: toolData.source});
     } else {

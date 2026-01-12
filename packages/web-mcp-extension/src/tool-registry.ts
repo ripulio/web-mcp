@@ -6,7 +6,10 @@ import type {
   ManifestCacheEntry,
   ToolRegistryResult,
   GroupedToolRegistryResult,
-  BrowsedToolsData
+  BrowsedToolsData,
+  DomainFilter,
+  PathFilter,
+  QueryFilter
 } from './shared.js';
 
 export type {ToolRegistryResult, GroupedToolRegistryResult};
@@ -23,16 +26,19 @@ interface ToolGroupResponse {
   tools: string[];
 }
 
-// Helper to extract domains and patterns from filters array
+// Helper to extract domains, pathPatterns, and queryParams from filters array
 function extractFilters(filters: RemoteTool['filters']): {
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 } {
-  const domainFilter = filters.find((f) => f.type === 'domain');
-  const pathFilter = filters.find((f) => f.type === 'path');
+  const domainFilter = filters.find((f): f is DomainFilter => f.type === 'domain');
+  const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
+  const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
   return {
     domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.patterns || []
+    pathPatterns: pathFilter?.paths || [],
+    queryParams: queryFilter?.parameters || {}
   };
 }
 
@@ -232,12 +238,13 @@ export async function searchToolsGrouped(
               name: group.name,
               description: group.description,
               tools: group.tools.map((tool) => {
-                const {domains, pathPatterns} = extractFilters(tool.filters);
+                const {domains, pathPatterns, queryParams} = extractFilters(tool.filters);
                 return {
                   name: tool.id,
                   description: tool.description,
                   domains,
                   pathPatterns,
+                  queryParams,
                   sourceUrl: 'local',
                   baseUrl: 'local',
                   groupName: group.name
@@ -258,12 +265,13 @@ export async function searchToolsGrouped(
             name: group.name,
             description: group.description,
             tools: group.tools.map((tool) => {
-              const {domains, pathPatterns} = extractFilters(tool.filters);
+              const {domains, pathPatterns, queryParams} = extractFilters(tool.filters);
               return {
                 name: tool.id,
                 description: tool.description,
                 domains,
                 pathPatterns,
+                queryParams,
                 sourceUrl: source.url,
                 baseUrl,
                 groupName: group.name
@@ -339,6 +347,7 @@ export async function refreshToolCache(
     name: string;
     domains: string[];
     pathPatterns: string[];
+    queryParams: Record<string, string>;
     description: string;
   }>
 ): Promise<void> {
@@ -368,6 +377,7 @@ export async function refreshToolCache(
         source,
         domains: tool.domains,
         pathPatterns: tool.pathPatterns,
+        queryParams: tool.queryParams,
         description: tool.description
       };
     }

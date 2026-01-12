@@ -3,23 +3,29 @@ import type {
   BrowsedToolsData,
   EnabledTools,
   ToolCache,
-  CachedToolData
+  CachedToolData,
+  DomainFilter,
+  PathFilter,
+  QueryFilter
 } from '../shared.js';
 import {parseToolDirectory} from '../directory-parser.js';
 import {useDirectoryPolling} from './useDirectoryPolling.js';
 
-// Helper to extract domains and pathPatterns from filters
+// Helper to extract domains, pathPatterns, and queryParams from filters
 function extractFilters(
-  filters: {type: string; domains?: string[]; patterns?: string[]}[]
+  filters: (DomainFilter | PathFilter | QueryFilter)[]
 ): {
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 } {
-  const domainFilter = filters.find((f) => f.type === 'domain');
-  const pathFilter = filters.find((f) => f.type === 'path');
+  const domainFilter = filters.find((f): f is DomainFilter => f.type === 'domain');
+  const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
+  const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
   return {
     domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.patterns || []
+    pathPatterns: pathFilter?.paths || [],
+    queryParams: queryFilter?.parameters || {}
   };
 }
 
@@ -56,11 +62,12 @@ async function syncLocalToolsToCache(
   for (const toolName of enabledLocalToolNames) {
     const browsedTool = browsedTools.tools.find((t) => t.id === toolName);
     if (browsedTool) {
-      const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+      const {domains, pathPatterns, queryParams} = extractFilters(browsedTool.filters);
       const toolData: CachedToolData = {
         source: browsedTool.source,
         domains,
         pathPatterns,
+        queryParams,
         description: browsedTool.description
       };
       toolCache['local'][toolName] = toolData;

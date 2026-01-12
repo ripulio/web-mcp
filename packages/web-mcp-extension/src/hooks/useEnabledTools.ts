@@ -9,22 +9,28 @@ import type {
   BrowsedToolsData,
   DisabledTools,
   DisabledGroups,
-  GroupedToolRegistryResult
+  GroupedToolRegistryResult,
+  DomainFilter,
+  PathFilter,
+  QueryFilter
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
 
-// Helper to extract domains and pathPatterns from browsedTools filters
+// Helper to extract domains, pathPatterns, and queryParams from browsedTools filters
 function extractFilters(
-  filters: {type: string; domains?: string[]; patterns?: string[]}[]
+  filters: (DomainFilter | PathFilter | QueryFilter)[]
 ): {
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 } {
-  const domainFilter = filters.find((f) => f.type === 'domain');
-  const pathFilter = filters.find((f) => f.type === 'path');
+  const domainFilter = filters.find((f): f is DomainFilter => f.type === 'domain');
+  const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
+  const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
   return {
     domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.patterns || []
+    pathPatterns: pathFilter?.paths || [],
+    queryParams: queryFilter?.parameters || {}
   };
 }
 
@@ -127,11 +133,12 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         if (!browsedTool) {
           throw new Error('Tool not found in browsed tools');
         }
-        const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+        const {domains, pathPatterns, queryParams} = extractFilters(browsedTool.filters);
         toolData = {
           source: browsedTool.source,
           domains,
           pathPatterns,
+          queryParams,
           description: browsedTool.description
         };
       } else {
@@ -141,6 +148,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
           source,
           domains: entry.domains,
           pathPatterns: entry.pathPatterns,
+          queryParams: entry.queryParams,
           description: entry.description
         };
       }
@@ -234,11 +242,12 @@ export function useEnabledTools(): UseEnabledToolsReturn {
             (t) => t.id === tool.name
           );
           if (browsedTool) {
-            const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+            const {domains, pathPatterns, queryParams} = extractFilters(browsedTool.filters);
             toolCache[sourceUrl][tool.name] = {
               source: browsedTool.source,
               domains,
               pathPatterns,
+              queryParams,
               description: browsedTool.description
             };
             updatedTools[compositeId] = {
@@ -268,6 +277,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
               source: result.value.source,
               domains: tool.domains,
               pathPatterns: tool.pathPatterns,
+              queryParams: tool.queryParams,
               description: tool.description
             };
             updatedTools[compositeId] = {
@@ -393,11 +403,12 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         const compositeId = `${sourceUrl}:${tool.name}`;
         const browsedTool = browsedTools?.tools.find((t) => t.id === tool.name);
         if (browsedTool) {
-          const {domains, pathPatterns} = extractFilters(browsedTool.filters);
+          const {domains, pathPatterns, queryParams} = extractFilters(browsedTool.filters);
           toolCache[sourceUrl][tool.name] = {
             source: browsedTool.source,
             domains,
             pathPatterns,
+            queryParams,
             description: browsedTool.description
           };
           updatedTools[compositeId] = {
@@ -426,6 +437,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
             source: result.value.source,
             domains: tool.domains,
             pathPatterns: tool.pathPatterns,
+            queryParams: tool.queryParams,
             description: tool.description
           };
           updatedTools[compositeId] = {

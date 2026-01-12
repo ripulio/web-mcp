@@ -128,6 +128,7 @@ export function useSources(options: UseSourcesOptions): UseSourcesReturn {
             name: tool.name,
             domains: tool.domains,
             pathPatterns: tool.pathPatterns,
+            queryParams: tool.queryParams,
             description: tool.description
           }))
       );
