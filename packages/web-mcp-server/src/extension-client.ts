@@ -2,10 +2,10 @@ import {TabInfo} from './types.js';
 import {ServerMessageType} from './message-types.js';
 import {getOrCreateSession, generateCallId, Session} from './session.js';
 import {
-  startServer as startWsServer,
+  startServer,
   send,
   isSocketConnected,
-  getActivePort as getWsActivePort
+  getActivePort
 } from './ws-server.js';
 
 // Timeout values in milliseconds
@@ -75,8 +75,7 @@ function createCallOperation<T>(
 }
 
 // Re-export ws-server functions
-export const startServer = startWsServer;
-export const getActivePort = getWsActivePort;
+export {startServer, getActivePort};
 
 export function isConnected(): boolean {
   return isSocketConnected();
