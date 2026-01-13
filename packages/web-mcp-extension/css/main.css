@@ -846,3 +846,91 @@ body {
 .source-menu-item input[type="checkbox"] {
   margin: 0;
 }
+
+/* Custom Sources Section */
+.custom-source-form {
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.custom-sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.custom-source-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.source-name {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.875rem;
+}
+
+.source-url-secondary {
+  font-size: 0.75rem;
+  color: #666;
+  font-family: monospace;
+  margin-left: 0.5rem;
+}
+
+.add-source-button {
+  padding: 0.5rem 1rem;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.add-source-button:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.add-source-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.remove-source-button {
+  padding: 0.375rem 0.75rem;
+  background: none;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.remove-source-button:hover {
+  color: #e53935;
+  border-color: #e53935;
+  background: #ffebee;
+}
+
+.no-sources-message {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  color: #666;
+  font-size: 0.875rem;
+  text-align: center;
+}

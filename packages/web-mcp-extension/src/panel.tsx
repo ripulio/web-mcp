@@ -27,6 +27,9 @@ import {
 import {
   BrowserControlSection
 } from './components/BrowserControlSection.js';
+import {
+  CustomSourcesSection
+} from './components/CustomSourcesSection.js';
 
 function Panel() {
   // Initialize hooks
@@ -37,19 +40,15 @@ function Panel() {
   const expandableHook = useExpandableUI(registryHook.activeRegistry);
   const browserControlStatus = useBrowserControlStatus();
 
-  // Get the first connected MCP port (undefined if none connected)
-  const mcpPort = browserControlStatus.status.connectedPorts[0];
-
-  // Reload registry when settings or MCP port changes
+  // Reload registry when settings change
   useEffect(() => {
     if (!settingsHook.loading) {
-      const sources = deriveSourcesFromSettings(settingsHook.settings, mcpPort);
+      const sources = deriveSourcesFromSettings(settingsHook.settings);
       registryHook.loadRegistry(sources);
     }
   }, [
     settingsHook.loading,
-    settingsHook.localToolsEnabled,
-    mcpPort // Will trigger re-load when port is discovered
+    settingsHook.settings.customSources
   ]);
 
   // Filter registry based on search
@@ -80,12 +79,17 @@ function Panel() {
           enabled={settingsHook.browserControlEnabled}
           connectedPorts={browserControlStatus.status.connectedPorts}
           onToggle={settingsHook.handleBrowserControlToggle}
-          localToolsEnabled={settingsHook.localToolsEnabled}
-          onLocalToolsToggle={settingsHook.handleLocalToolsToggle}
-          localToolsPort={mcpPort ? mcpPort + 1 : undefined}
-          localToolsError={
-            mcpPort ? registryHook.sourceErrors[`http://localhost:${mcpPort + 1}`] : undefined
-          }
+        />
+
+        {/* Custom Sources Section */}
+        <CustomSourcesSection
+          customSources={settingsHook.settings.customSources}
+          onSourcesChange={(sources) => {
+            settingsHook.saveSettings({
+              ...settingsHook.settings,
+              customSources: sources
+            });
+          }}
         />
 
         {/* Tools Section */}

@@ -1,33 +1,20 @@
 import {useState, useEffect} from 'preact/hooks';
 import type {WebMCPSettings, PackageSource} from '../shared.js';
-import {
-  DEFAULT_SETTINGS,
-  DEFAULT_PACKAGE_SOURCE,
-  getLocalhostSource
-} from '../shared.js';
+import {DEFAULT_SETTINGS, DEFAULT_PACKAGE_SOURCE} from '../shared.js';
 
 // Helper function to derive sources array from settings
-// mcpPort: The port of the connected MCP server (local tools will use mcpPort + 1)
 export function deriveSourcesFromSettings(
-  settings: WebMCPSettings,
-  mcpPort?: number
+  settings: WebMCPSettings
 ): PackageSource[] {
-  const sources = [DEFAULT_PACKAGE_SOURCE];
-  if (settings.localToolsEnabled && mcpPort !== undefined) {
-    const localToolsPort = mcpPort + 1;
-    sources.push(getLocalhostSource(localToolsPort));
-  }
-  return sources;
+  return [DEFAULT_PACKAGE_SOURCE, ...settings.customSources];
 }
 
 export interface UseSettingsReturn {
   settings: WebMCPSettings;
   loading: boolean;
   browserControlEnabled: boolean;
-  localToolsEnabled: boolean;
   saveSettings: (newSettings: WebMCPSettings) => Promise<void>;
   handleBrowserControlToggle: (enabled: boolean) => Promise<void>;
-  handleLocalToolsToggle: (enabled: boolean) => Promise<void>;
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -52,7 +39,6 @@ export function useSettings(): UseSettingsReturn {
   };
 
   const browserControlEnabled = settings.browserControlEnabled ?? false;
-  const localToolsEnabled = settings.localToolsEnabled ?? false;
 
   const handleBrowserControlToggle = async (enabled: boolean) => {
     const newSettings = {...settings, browserControlEnabled: enabled};
@@ -65,18 +51,11 @@ export function useSettings(): UseSettingsReturn {
     });
   };
 
-  const handleLocalToolsToggle = async (enabled: boolean) => {
-    const newSettings = {...settings, localToolsEnabled: enabled};
-    await saveSettings(newSettings);
-  };
-
   return {
     settings,
     loading,
     browserControlEnabled,
-    localToolsEnabled,
     saveSettings,
-    handleBrowserControlToggle,
-    handleLocalToolsToggle
+    handleBrowserControlToggle
   };
 }
