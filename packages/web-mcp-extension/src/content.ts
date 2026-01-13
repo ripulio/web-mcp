@@ -103,17 +103,13 @@ async function evaluateAndInjectTools() {
   const settings = result.webmcpSettings;
   const toolCache = result.toolCache || {};
 
-  // Get MCP server status to determine local tools port
-  const response = await chrome.runtime.sendMessage({
-    type: 'BROWSER_CONTROL_GET_STATUS'
-  });
-  const mcpPort = response?.connectedPorts?.[0];
-
   // Build set of enabled source URLs from settings
   const enabledSourceUrls = new Set<string>();
   enabledSourceUrls.add('https://web-mcp.org/api'); // Always enabled
-  if (settings?.localToolsEnabled && mcpPort !== undefined) {
-    enabledSourceUrls.add(`http://localhost:${mcpPort + 1}`);
+  if (settings?.customSources) {
+    for (const source of settings.customSources) {
+      enabledSourceUrls.add(source.url);
+    }
   }
 
   console.log(
