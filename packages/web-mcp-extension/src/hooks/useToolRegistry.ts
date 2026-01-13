@@ -4,27 +4,16 @@ import {searchToolsGrouped} from '../tool-registry.js';
 
 export interface UseToolRegistryReturn {
   activeRegistry: GroupedToolRegistryResult[];
-  inactiveRegistry: GroupedToolRegistryResult[];
   sourceErrors: {[url: string]: string};
   loading: boolean;
   loadRegistry: (sources: PackageSource[]) => Promise<void>;
   clearSourceError: (url: string) => void;
   setSourceError: (url: string, error: string) => void;
-  moveToActive: (sourceUrl: string, data: GroupedToolRegistryResult) => void;
-  moveToInactive: (sourceUrl: string, data: GroupedToolRegistryResult) => void;
   removeFromRegistries: (sourceUrl: string) => void;
-  updateSourceInRegistry: (
-    sourceUrl: string,
-    data: GroupedToolRegistryResult,
-    isEnabled: boolean
-  ) => void;
 }
 
 export function useToolRegistry(): UseToolRegistryReturn {
   const [activeRegistry, setActiveRegistry] = useState<
-    GroupedToolRegistryResult[]
-  >([]);
-  const [inactiveRegistry, setInactiveRegistry] = useState<
     GroupedToolRegistryResult[]
   >([]);
   const [sourceErrors, setSourceErrors] = useState<{[url: string]: string}>({});
@@ -44,27 +33,9 @@ export function useToolRegistry(): UseToolRegistryReturn {
     }
     setSourceErrors(errors);
 
-    // Partition results by source enabled state
+    // All sources in the input array are enabled
     const successResults = results.filter((r) => !r.error);
-    const active: GroupedToolRegistryResult[] = [];
-    const inactive: GroupedToolRegistryResult[] = [];
-
-    for (const result of successResults) {
-      const source = sources.find((s) =>
-        s.type === 'local'
-          ? result.sourceUrl === 'local'
-          : s.url === result.sourceUrl
-      );
-      // enabled defaults to true if undefined
-      if (source?.enabled === false) {
-        inactive.push(result);
-      } else {
-        active.push(result);
-      }
-    }
-
-    setActiveRegistry(active);
-    setInactiveRegistry(inactive);
+    setActiveRegistry(successResults);
     setLoading(false);
   };
 
@@ -79,63 +50,17 @@ export function useToolRegistry(): UseToolRegistryReturn {
     setSourceErrors((prev) => ({...prev, [url]: error}));
   };
 
-  const moveToActive = (sourceUrl: string, data: GroupedToolRegistryResult) => {
-    setInactiveRegistry((prev) =>
-      prev.filter((r) => r.sourceUrl !== sourceUrl)
-    );
-    setActiveRegistry((prev) => [...prev, data]);
-  };
-
-  const moveToInactive = (
-    sourceUrl: string,
-    data: GroupedToolRegistryResult
-  ) => {
-    setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== sourceUrl));
-    setInactiveRegistry((prev) => [...prev, data]);
-  };
-
   const removeFromRegistries = (sourceUrl: string) => {
     setActiveRegistry((prev) => prev.filter((r) => r.sourceUrl !== sourceUrl));
-    setInactiveRegistry((prev) =>
-      prev.filter((r) => r.sourceUrl !== sourceUrl)
-    );
-  };
-
-  const updateSourceInRegistry = (
-    sourceUrl: string,
-    data: GroupedToolRegistryResult,
-    isEnabled: boolean
-  ) => {
-    if (isEnabled) {
-      setActiveRegistry((prev) => {
-        const filtered = prev.filter((r) => r.sourceUrl !== sourceUrl);
-        return [...filtered, data];
-      });
-      setInactiveRegistry((prev) =>
-        prev.filter((r) => r.sourceUrl !== sourceUrl)
-      );
-    } else {
-      setInactiveRegistry((prev) => {
-        const filtered = prev.filter((r) => r.sourceUrl !== sourceUrl);
-        return [...filtered, data];
-      });
-      setActiveRegistry((prev) =>
-        prev.filter((r) => r.sourceUrl !== sourceUrl)
-      );
-    }
   };
 
   return {
     activeRegistry,
-    inactiveRegistry,
     sourceErrors,
     loading,
     loadRegistry,
     clearSourceError,
     setSourceError,
-    moveToActive,
-    moveToInactive,
-    removeFromRegistries,
-    updateSourceInRegistry
+    removeFromRegistries
   };
 }

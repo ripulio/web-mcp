@@ -43,15 +43,8 @@ export interface DisabledGroups {
   [groupId: string]: true; // groupId = `${sourceUrl}:${groupName}`
 }
 
-export const LOCAL_SOURCE: PackageSource = {
-  url: 'local',
-  name: 'Local Tools',
-  type: 'local',
-  enabled: false
-};
-
 export interface WebMCPSettings {
-  packageSources: PackageSource[];
+  localToolsEnabled: boolean;
   browserControlEnabled: boolean;
 }
 
@@ -59,8 +52,15 @@ export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
   url: 'https://web-mcp.org/api'
 };
 
+export function getLocalhostSource(port: number): PackageSource {
+  return {
+    url: `http://localhost:${port}`,
+    name: `Local Tools (port ${port})`
+  };
+}
+
 export const DEFAULT_SETTINGS: WebMCPSettings = {
-  packageSources: [LOCAL_SOURCE, DEFAULT_PACKAGE_SOURCE],
+  localToolsEnabled: false,
   browserControlEnabled: false
 };
 

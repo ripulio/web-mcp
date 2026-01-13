@@ -3,61 +3,54 @@ import {useEffect} from 'preact/hooks';
 
 import {
   useSettings,
+  deriveSourcesFromSettings,
+} from './hooks/useSettings.js';
+import {
   useToolRegistry,
+} from './hooks/useToolRegistry.js';
+import {
   useEnabledTools,
-  useBrowsedTools,
-  useSources,
+} from './hooks/useEnabledTools.js';
+import {
   useToolSearch,
+} from './hooks/useToolSearch.js';
+import {
   useExpandableUI,
+} from './hooks/useExpandableUI.js';
+import {
   useBrowserControlStatus
-} from './hooks/index.js';
+} from './hooks/useBrowserControlStatus.js';
 
 import {
-  SourceList,
-  AddSourceForm,
   ToolsSection,
+} from './components/ToolsSection.js';
+import {
   BrowserControlSection
-} from './components/index.js';
+} from './components/BrowserControlSection.js';
 
 function Panel() {
   // Initialize hooks
   const settingsHook = useSettings();
   const registryHook = useToolRegistry();
   const enabledToolsHook = useEnabledTools();
-
-  const browsedToolsHook = useBrowsedTools({
-    onRefresh: async () => {
-      await registryHook.loadRegistry(settingsHook.settings.packageSources);
-    }
-  });
-
-  const sourcesHook = useSources({
-    settings: settingsHook.settings,
-    saveSettings: settingsHook.saveSettings,
-    loadRegistry: registryHook.loadRegistry,
-    clearSourceError: registryHook.clearSourceError,
-    setSourceError: registryHook.setSourceError,
-    removeFromRegistries: registryHook.removeFromRegistries,
-    updateSourceInRegistry: registryHook.updateSourceInRegistry,
-    moveToActive: registryHook.moveToActive,
-    moveToInactive: registryHook.moveToInactive,
-    inactiveRegistry: registryHook.inactiveRegistry,
-    activeRegistry: registryHook.activeRegistry,
-    browsedTools: browsedToolsHook.browsedTools,
-    onRefreshBrowsedTools: browsedToolsHook.handleRefreshBrowsedTools,
-    onAutoEnable: enabledToolsHook.autoEnableTools
-  });
-
   const searchHook = useToolSearch();
   const expandableHook = useExpandableUI(registryHook.activeRegistry);
   const browserControlStatus = useBrowserControlStatus();
 
-  // Initial load - coordinate settings and registry
+  // Get the first connected MCP port (undefined if none connected)
+  const mcpPort = browserControlStatus.status.connectedPorts[0];
+
+  // Reload registry when settings or MCP port changes
   useEffect(() => {
     if (!settingsHook.loading) {
-      registryHook.loadRegistry(settingsHook.settings.packageSources);
+      const sources = deriveSourcesFromSettings(settingsHook.settings, mcpPort);
+      registryHook.loadRegistry(sources);
     }
-  }, [settingsHook.loading]);
+  }, [
+    settingsHook.loading,
+    settingsHook.localToolsEnabled,
+    mcpPort // Will trigger re-load when port is discovered
+  ]);
 
   // Filter registry based on search
   const filteredRegistry = searchHook.filterRegistry(registryHook.activeRegistry);
@@ -82,44 +75,17 @@ function Panel() {
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
       <div class="panel-content">
-        {/* Package Sources Section */}
-        <div class="settings-section">
-          <h2 class="section-title">Sources</h2>
-          <SourceList
-            sources={settingsHook.settings.packageSources}
-            sourceErrors={registryHook.sourceErrors}
-            refreshingSource={sourcesHook.refreshingSource}
-            isBrowsing={browsedToolsHook.isBrowsing}
-            browsedTools={browsedToolsHook.browsedTools}
-            browsingError={browsedToolsHook.browsingError}
-            activeRegistry={registryHook.activeRegistry}
-            inactiveRegistry={registryHook.inactiveRegistry}
-            onSourceToggle={sourcesHook.handleSourceToggle}
-            onRefreshSource={sourcesHook.handleRefreshSource}
-            onRemoveSource={sourcesHook.handleRemoveSource}
-            onBrowseDirectory={browsedToolsHook.handleBrowseDirectory}
-            onRefreshBrowsedTools={browsedToolsHook.handleRefreshBrowsedTools}
-            onClearBrowsedTools={browsedToolsHook.handleClearBrowsedTools}
-            pollingEnabled={browsedToolsHook.pollingEnabled}
-            pollingError={browsedToolsHook.pollingError}
-            onPollingToggle={browsedToolsHook.handlePollingToggle}
-            onAutoEnableToggle={sourcesHook.handleAutoEnableToggle}
-          />
-          <AddSourceForm
-            newSourceUrl={sourcesHook.newSourceUrl}
-            onNewSourceUrlChange={sourcesHook.setNewSourceUrl}
-            addingSource={sourcesHook.addingSource}
-            addSourceError={sourcesHook.addSourceError}
-            onAddSource={sourcesHook.handleAddSource}
-            onClearError={sourcesHook.clearAddSourceError}
-          />
-        </div>
-
         {/* Browser Control MCP Server Section */}
         <BrowserControlSection
           enabled={settingsHook.browserControlEnabled}
           connectedPorts={browserControlStatus.status.connectedPorts}
           onToggle={settingsHook.handleBrowserControlToggle}
+          localToolsEnabled={settingsHook.localToolsEnabled}
+          onLocalToolsToggle={settingsHook.handleLocalToolsToggle}
+          localToolsPort={mcpPort ? mcpPort + 1 : undefined}
+          localToolsError={
+            mcpPort ? registryHook.sourceErrors[`http://localhost:${mcpPort + 1}`] : undefined
+          }
         />
 
         {/* Tools Section */}

@@ -2,23 +2,8 @@ import type {
   EnabledTools,
   StoredTool,
   WebMCPSettings,
-  ToolCache,
-  BrowsedToolsData,
-  BrowsedTool
+  ToolCache
 } from './shared.js';
-
-// Extract domains and pathPatterns from filters array (for legacy browsedTools fallback)
-function extractFilters(filters: BrowsedTool['filters']): {
-  domains: string[];
-  pathPatterns: string[];
-} {
-  const domainFilter = filters.find((f) => f.type === 'domain');
-  const pathFilter = filters.find((f) => f.type === 'path');
-  return {
-    domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.patterns || []
-  };
-}
 
 // Resolved tool data for injection
 interface ResolvedToolData {
@@ -112,36 +97,23 @@ async function evaluateAndInjectTools() {
     enabledToolGroups: EnabledTools;
     webmcpSettings: WebMCPSettings;
     toolCache: ToolCache;
-    // Legacy fallback storage (for migration)
-    sourceCache: ToolCache;
-    browsedTools: BrowsedToolsData;
-  }>([
-    'enabledToolGroups',
-    'webmcpSettings',
-    'toolCache',
-    'sourceCache',
-    'browsedTools'
-  ]);
+  }>(['enabledToolGroups', 'webmcpSettings', 'toolCache']);
+
   const enabledTools = result.enabledToolGroups || {};
   const settings = result.webmcpSettings;
   const toolCache = result.toolCache || {};
-  // Legacy storage for fallback during migration
-  const legacySourceCache = result.sourceCache || {};
-  const legacyBrowsedTools = result.browsedTools;
 
-  // Build set of enabled source URLs
+  // Get MCP server status to determine local tools port
+  const response = await chrome.runtime.sendMessage({
+    type: 'BROWSER_CONTROL_GET_STATUS'
+  });
+  const mcpPort = response?.connectedPorts?.[0];
+
+  // Build set of enabled source URLs from settings
   const enabledSourceUrls = new Set<string>();
-  if (settings?.packageSources) {
-    for (const source of settings.packageSources) {
-      // enabled defaults to true when undefined
-      if (source.enabled !== false) {
-        const url = source.type === 'local' ? 'local' : source.url;
-        enabledSourceUrls.add(url);
-      }
-    }
-  } else {
-    // No settings yet - assume all sources enabled
-    enabledSourceUrls.add('local');
+  enabledSourceUrls.add('https://web-mcp.org/api'); // Always enabled
+  if (settings?.localToolsEnabled && mcpPort !== undefined) {
+    enabledSourceUrls.add(`http://localhost:${mcpPort + 1}`);
   }
 
   console.log(
@@ -161,51 +133,19 @@ async function evaluateAndInjectTools() {
     }
 
     // Look up tool data from unified toolCache
-    let toolData: ResolvedToolData | null = null;
     const cached = toolCache[toolRef.sourceUrl]?.[toolRef.name];
-
-    if (cached) {
-      // Found in unified cache
-      toolData = {
-        source: cached.source,
-        domains: cached.domains,
-        pathPatterns: cached.pathPatterns
-      };
-    } else {
-      // Fallback to legacy storage for migration
-      if (toolRef.sourceUrl === 'local') {
-        // Legacy local tools: look up from browsedTools
-        const browsedTool = legacyBrowsedTools?.tools.find(
-          (t) => t.id === toolRef.name
-        );
-        if (browsedTool) {
-          const {domains, pathPatterns} = extractFilters(browsedTool.filters);
-          toolData = {
-            source: browsedTool.source,
-            domains,
-            pathPatterns
-          };
-        }
-      } else {
-        // Legacy remote tools: look up from sourceCache
-        const legacyCached =
-          legacySourceCache[toolRef.sourceUrl]?.[toolRef.name];
-        if (legacyCached) {
-          toolData = {
-            source: legacyCached.source,
-            domains: legacyCached.domains,
-            pathPatterns: legacyCached.pathPatterns
-          };
-        }
-      }
-    }
-
-    if (!toolData) {
+    if (!cached) {
       console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: tool data not found in source storage`
+        `[WebMCP] Tool "${toolRef.name}" skipped: not found in toolCache`
       );
       continue;
     }
+
+    const toolData: ResolvedToolData = {
+      source: cached.source,
+      domains: cached.domains,
+      pathPatterns: cached.pathPatterns
+    };
 
     const domainMatches = toolData.domains.some(
       (domain) => window.location.hostname === domain

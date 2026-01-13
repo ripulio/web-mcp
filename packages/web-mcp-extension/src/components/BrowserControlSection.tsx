@@ -2,12 +2,20 @@ export interface BrowserControlSectionProps {
   enabled: boolean;
   connectedPorts: number[];
   onToggle: (enabled: boolean) => void;
+  localToolsEnabled: boolean;
+  onLocalToolsToggle: (enabled: boolean) => void;
+  localToolsError?: string;
+  localToolsPort?: number;
 }
 
 export function BrowserControlSection({
   enabled,
   connectedPorts,
-  onToggle
+  onToggle,
+  localToolsEnabled,
+  onLocalToolsToggle,
+  localToolsError,
+  localToolsPort
 }: BrowserControlSectionProps) {
   return (
     <div class="settings-section">
@@ -43,7 +51,7 @@ export function BrowserControlSection({
           <span class="toggle-slider"></span>
         </label>
         <span class="browser-control-label">
-          {enabled ? 'Enabled' : 'Disabled'}
+          Enable Browser Control
         </span>
         {enabled && connectedPorts.length > 0 && (
           <span class="browser-control-status">
@@ -55,6 +63,29 @@ export function BrowserControlSection({
         {enabled && connectedPorts.length === 0 && (
           <span class="browser-control-status scanning">
             Scanning for servers...
+          </span>
+        )}
+      </div>
+
+      <div class="browser-control-row">
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            checked={localToolsEnabled}
+            onChange={() => onLocalToolsToggle(!localToolsEnabled)}
+            disabled={!localToolsPort}
+          />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="browser-control-label">
+          Enable Local Tools
+          {localToolsPort
+            ? ` (localhost:${localToolsPort})`
+            : ' (requires MCP server connection)'}
+        </span>
+        {localToolsError && localToolsPort && (
+          <span class="browser-control-status error">
+            {localToolsError}
           </span>
         )}
       </div>
