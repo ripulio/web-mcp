@@ -52,10 +52,12 @@ export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
   url: 'https://web-mcp.org/api'
 };
 
-export const LOCALHOST_SOURCE: PackageSource = {
-  url: 'http://localhost:3000',
-  name: 'Local Development Server'
-};
+export function getLocalhostSource(port: number): PackageSource {
+  return {
+    url: `http://localhost:${port}`,
+    name: `Local Tools (port ${port})`
+  };
+}
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
   localToolsEnabled: false,

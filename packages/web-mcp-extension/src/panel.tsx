@@ -3,6 +3,7 @@ import {useEffect} from 'preact/hooks';
 
 import {
   useSettings,
+  deriveSourcesFromSettings,
 } from './hooks/useSettings.js';
 import {
   useToolRegistry,
@@ -36,19 +37,20 @@ function Panel() {
   const expandableHook = useExpandableUI(registryHook.activeRegistry);
   const browserControlStatus = useBrowserControlStatus();
 
-  // Initial load - use derived sources
-  useEffect(() => {
-    if (!settingsHook.loading) {
-      registryHook.loadRegistry(settingsHook.derivedSources);
-    }
-  }, [settingsHook.loading]);
+  // Get the first connected MCP port (undefined if none connected)
+  const mcpPort = browserControlStatus.status.connectedPorts[0];
 
-  // Reload when localToolsEnabled changes
+  // Reload registry when settings or MCP port changes
   useEffect(() => {
     if (!settingsHook.loading) {
-      registryHook.loadRegistry(settingsHook.derivedSources);
+      const sources = deriveSourcesFromSettings(settingsHook.settings, mcpPort);
+      registryHook.loadRegistry(sources);
     }
-  }, [settingsHook.localToolsEnabled]);
+  }, [
+    settingsHook.loading,
+    settingsHook.localToolsEnabled,
+    mcpPort // Will trigger re-load when port is discovered
+  ]);
 
   // Filter registry based on search
   const filteredRegistry = searchHook.filterRegistry(registryHook.activeRegistry);
@@ -80,7 +82,10 @@ function Panel() {
           onToggle={settingsHook.handleBrowserControlToggle}
           localToolsEnabled={settingsHook.localToolsEnabled}
           onLocalToolsToggle={settingsHook.handleLocalToolsToggle}
-          localToolsError={registryHook.sourceErrors['http://localhost:3000']}
+          localToolsPort={mcpPort ? mcpPort + 1 : undefined}
+          localToolsError={
+            mcpPort ? registryHook.sourceErrors[`http://localhost:${mcpPort + 1}`] : undefined
+          }
         />
 
         {/* Tools Section */}

@@ -3,14 +3,19 @@ import type {WebMCPSettings, PackageSource} from '../shared.js';
 import {
   DEFAULT_SETTINGS,
   DEFAULT_PACKAGE_SOURCE,
-  LOCALHOST_SOURCE
+  getLocalhostSource
 } from '../shared.js';
 
 // Helper function to derive sources array from settings
-function deriveSourcesFromSettings(settings: WebMCPSettings): PackageSource[] {
+// mcpPort: The port of the connected MCP server (local tools will use mcpPort + 1)
+export function deriveSourcesFromSettings(
+  settings: WebMCPSettings,
+  mcpPort?: number
+): PackageSource[] {
   const sources = [DEFAULT_PACKAGE_SOURCE];
-  if (settings.localToolsEnabled) {
-    sources.push(LOCALHOST_SOURCE);
+  if (settings.localToolsEnabled && mcpPort !== undefined) {
+    const localToolsPort = mcpPort + 1;
+    sources.push(getLocalhostSource(localToolsPort));
   }
   return sources;
 }
@@ -20,7 +25,6 @@ export interface UseSettingsReturn {
   loading: boolean;
   browserControlEnabled: boolean;
   localToolsEnabled: boolean;
-  derivedSources: PackageSource[];
   saveSettings: (newSettings: WebMCPSettings) => Promise<void>;
   handleBrowserControlToggle: (enabled: boolean) => Promise<void>;
   handleLocalToolsToggle: (enabled: boolean) => Promise<void>;
@@ -49,7 +53,6 @@ export function useSettings(): UseSettingsReturn {
 
   const browserControlEnabled = settings.browserControlEnabled ?? false;
   const localToolsEnabled = settings.localToolsEnabled ?? false;
-  const derivedSources = deriveSourcesFromSettings(settings);
 
   const handleBrowserControlToggle = async (enabled: boolean) => {
     const newSettings = {...settings, browserControlEnabled: enabled};
@@ -72,7 +75,6 @@ export function useSettings(): UseSettingsReturn {
     loading,
     browserControlEnabled,
     localToolsEnabled,
-    derivedSources,
     saveSettings,
     handleBrowserControlToggle,
     handleLocalToolsToggle
