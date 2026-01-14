@@ -31,7 +31,9 @@ function extractFilters(filters: RemoteTool['filters']): {
   pathPatterns: string[];
   queryParams: Record<string, string>;
 } {
-  const domainFilter = filters.find((f): f is DomainFilter => f.type === 'domain');
+  const domainFilter = filters.find(
+    (f): f is DomainFilter => f.type === 'domain'
+  );
   const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
   const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
   return {
@@ -146,7 +148,9 @@ export async function searchToolsGrouped(
             name: group.name,
             description: group.description,
             tools: group.tools.map((tool) => {
-              const {domains, pathPatterns, queryParams} = extractFilters(tool.filters);
+              const {domains, pathPatterns, queryParams} = extractFilters(
+                tool.filters
+              );
               return {
                 name: tool.id,
                 description: tool.description,
