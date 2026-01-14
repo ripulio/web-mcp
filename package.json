@@ -1,5 +1,5 @@
 {
-  "name": "@ripul/web-mcp-monorepo",
+  "name": "@ripulio/web-mcp-monorepo",
   "type": "module",
   "private": true,
   "workspaces": [

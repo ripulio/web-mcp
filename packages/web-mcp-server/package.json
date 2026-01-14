@@ -1,5 +1,5 @@
 {
-  "name": "@ripul/web-mcp-server",
+  "name": "@ripulio/web-mcp-server",
   "version": "0.0.1",
   "bin": {
     "web-mcp-server": "bin.mjs"
