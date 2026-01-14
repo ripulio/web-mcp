@@ -1,5 +1,5 @@
 {
-  "name": "@ripul/web-mcp-extension",
+  "name": "@ripulio/web-mcp-extension",
   "private": true,
   "version": "0.0.1",
   "description": "A Chrome extension for Web MCP.",
