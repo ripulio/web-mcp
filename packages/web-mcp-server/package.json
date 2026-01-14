@@ -1,5 +1,8 @@
 {
   "name": "@ripulio/web-mcp-server",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.2",
   "bin": {
     "web-mcp-server": "bin.mjs"
