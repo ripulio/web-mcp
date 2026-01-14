@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "A WebMCP browser polyfill.",
   "files": [
-    "lib"
+    "lib",
+    "!*.map"
   ],
   "keywords": [
     "webmcp",

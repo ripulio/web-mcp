@@ -6,7 +6,8 @@
   },
   "description": "A WebMCP MCP server.",
   "files": [
-    "lib"
+    "lib",
+    "!*.map"
   ],
   "keywords": [
     "webmcp",
