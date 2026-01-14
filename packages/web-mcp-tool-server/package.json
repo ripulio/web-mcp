@@ -1,0 +1,44 @@
+{
+  "name": "@ripulio/web-mcp-tool-server",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.1",
+  "bin": {
+    "web-mcp-tool-server": "bin.mjs"
+  },
+  "description": "A local HTTP server for serving WebMCP tool files.",
+  "files": [
+    "lib",
+    "bin.mjs",
+    "!*.map"
+  ],
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "web",
+    "tools"
+  ],
+  "homepage": "https://github.com/ripulio/web-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/ripulio/web-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ripulio/web-mcp.git"
+  },
+  "license": "MIT",
+  "author": "James Garbutt (https://github.com/43081j)",
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "build:typecheck": "tsc -p tsconfig.test.json",
+    "build:js": "tsc",
+    "build": "npm run build:typecheck && npm run build:js"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.7",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {}
+}
