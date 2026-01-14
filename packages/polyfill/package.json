@@ -1,5 +1,8 @@
 {
   "name": "webmcp-polyfill",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "A WebMCP browser polyfill.",
   "files": [
