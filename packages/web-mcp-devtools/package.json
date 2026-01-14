@@ -1,5 +1,6 @@
 {
-  "name": "@ripul/web-mcp-devtools",
+  "name": "@ripulio/web-mcp-devtools",
+  "private": true,
   "version": "0.0.1",
   "description": "A Chrome DevTools extension for Web MCP.",
   "homepage": "https://github.com/ripulio/web-mcp#readme",

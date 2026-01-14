@@ -1,9 +1,16 @@
 {
-  "name": "@ripul/web-mcp-bridge",
-  "version": "0.0.1",
-  "description": "A WebMCP MCP implementation.",
+  "name": "@ripulio/web-mcp-server",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.3",
+  "bin": {
+    "web-mcp-server": "bin.mjs"
+  },
+  "description": "A WebMCP MCP server.",
   "files": [
-    "lib"
+    "lib",
+    "!*.map"
   ],
   "keywords": [
     "webmcp",
@@ -28,11 +35,12 @@
     "build": "npm run build:typecheck && npm run build:js"
   },
   "devDependencies": {
-    "webmcp-polyfill": "*",
+    "@types/node": "^25.0.7",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.9.2"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "puppeteer": "^24.35.0"
+    "ws": "^8.18.0"
   }
 }
