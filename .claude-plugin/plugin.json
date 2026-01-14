@@ -12,8 +12,8 @@
   "keywords": ["browser", "chrome", "mcp", "automation", "tabs", "web"],
   "mcpServers": {
     "web-mcp-server": {
-      "command": "npx @ripulio/web-mcp-server",
-      "args": ["--stdio"]
-    },
+      "command": "npx",
+      "args": ["-y", "@ripulio/web-mcp-server@1.1.0", "--stdio"]
+    }
   }
 }

@@ -7,7 +7,7 @@
   "metadata": {
     "description": "MCP server for Chrome browser control",
     "version": "1.1.0",
-    "repository": "https://github.com/ripulio/browser-mcp"
+    "repository": "https://github.com/ripulio/web-mcp"
   },
   "plugins": [
     {
