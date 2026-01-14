@@ -1,76 +1,58 @@
-name: Publish to npm
-permissions: {}
+name: Publish new release
+
 on:
-  release:
-    types:
-      - published
+  push:
+    branches:
+      - main
+permissions: {}
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  release:
     permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - name: Install Browser
-        run: npx playwright install chromium
-      - run: npm run lint
-      - run: npm test
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      tarball: ${{ steps.pack.outputs.tarball }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - run: npm version $TAG_NAME --git-tag-version=false
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-      - id: pack
-        run: |-
-          TARBALL=$(npm pack)
-          echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v6
-        with:
-          name: tarball
-          path: ${{ steps.pack.outputs.tarball }}
-  publish:
-    needs:
-      - test
-      - build
-    runs-on: ubuntu-latest
-    permissions:
+      contents: write
       id-token: write
-    env:
-      TARBALL: ${{ needs.build.outputs.tarball }}
+      pull-requests: write
+    if: github.repository == 'ripulio/web-mcp'
+    name: Release
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
     steps:
-      - uses: actions/download-artifact@v7
+      - name: checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          name: tarball
-      - uses: actions/setup-node@v6
+          fetch-depth: 0
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 24
-          package-manager-cache: false
-      - run: npm publish --provenance --access public --tag next $TARBALL
-        if: github.event.release.prerelease
+          package-manager-cache: true
+      - name: install
+        run: npm ci --ignore-scripts
+      - name: build
+        run: npm run build
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@e0145edc7d9d8679003495b11f87bd8ef63c0cba # v1.5.3
+        with:
+          version: pnpm release:version
+          publish: pnpm release:publish
         env:
-          TARBALL: ${{ needs.build.outputs.tarball }}
-      - run: npm publish --provenance --access public $TARBALL
-        if: "!github.event.release.prerelease"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+      - name: Check if extension was published
+        if: steps.changesets.outputs.published == 'true'
+        id: check-extension
+        run: |
+          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
+          VERSION=$(echo "$PACKAGES" | jq -r '.[] | select(.name == "@ripul/web-mcp-extension") | .version')
+          if [ -n "$VERSION" ]; then
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload extension zip to release
+        if: steps.check-extension.outputs.version
         env:
-          TARBALL: ${{ needs.build.outputs.tarball }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd packages/web-mcp-extension
+          zip -r ../../webmcp-extension.zip extension
+          gh release upload "@ripul/web-mcp-extension@${{ steps.check-extension.outputs.version }}" ../../webmcp-extension.zip --clobber
