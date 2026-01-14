@@ -46,7 +46,7 @@ jobs:
         id: check-extension
         run: |
           PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
-          VERSION=$(echo "$PACKAGES" | jq -r '.[] | select(.name == "@ripul/web-mcp-extension") | .version')
+          VERSION=$(echo "$PACKAGES" | jq -r '.[] | select(.name == "@ripulio/web-mcp-extension") | .version')
           if [ -n "$VERSION" ]; then
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
@@ -57,4 +57,4 @@ jobs:
         run: |
           cd packages/web-mcp-extension
           zip -r ../../webmcp-extension.zip extension
-          gh release upload "@ripul/web-mcp-extension@${{ steps.check-extension.outputs.version }}" ../../webmcp-extension.zip --clobber
+          gh release upload "@ripulio/web-mcp-extension@${{ steps.check-extension.outputs.version }}" ../../webmcp-extension.zip --clobber
