@@ -1,7 +1,7 @@
 {
   "name": "@ripulio/web-mcp-extension",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A Chrome extension for Web MCP.",
   "homepage": "https://github.com/ripulio/web-mcp#readme",
   "files": [
