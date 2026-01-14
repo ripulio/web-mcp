@@ -11,9 +11,12 @@
     "lint": "npm run lint:format && npm run lint:js",
     "format": "prettier --write \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
     "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
-    "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\""
+    "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\"",
+    "release:version": "changeset version",
+    "release:publish": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@eslint/js": "^9.39.2",
     "@vitest/browser-playwright": "^4.0.17",
     "eslint": "^9.39.2",
