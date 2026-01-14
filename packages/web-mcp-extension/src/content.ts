@@ -10,6 +10,7 @@ interface ResolvedToolData {
   source: string;
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
 }
 
 export interface ToolToInject {
@@ -140,7 +141,8 @@ async function evaluateAndInjectTools() {
     const toolData: ResolvedToolData = {
       source: cached.source,
       domains: cached.domains,
-      pathPatterns: cached.pathPatterns
+      pathPatterns: cached.pathPatterns,
+      queryParams: cached.queryParams || {}
     };
 
     const domainMatches = toolData.domains.some(
@@ -166,11 +168,26 @@ async function evaluateAndInjectTools() {
       continue;
     }
 
+    // Check if query parameters match (empty object means match all)
+    const queryParamKeys = Object.keys(toolData.queryParams);
+    const queryMatches =
+      queryParamKeys.length === 0 ||
+      queryParamKeys.every((key) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(key) === toolData.queryParams[key];
+      });
+    if (!queryMatches) {
+      console.log(
+        `[WebMCP] Tool "${toolRef.name}" skipped: query param mismatch (expected ${JSON.stringify(toolData.queryParams)}, got ${window.location.search})`
+      );
+      continue;
+    }
+
     // Use tool name as the identifier
     const toolId = toolRef.name;
     if (!currentlyRegisteredTools.has(toolId)) {
       console.log(
-        `[WebMCP] Tool "${toolRef.name}" will be injected (domain and path match)`
+        `[WebMCP] Tool "${toolRef.name}" will be injected (domain, path, and query match)`
       );
       toolsToInject.push({toolId, source: toolData.source});
     } else {
