@@ -12,8 +12,8 @@
     "format": "prettier --write \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
     "lint:format": "prettier --check \"packages/*/{test,src}/**/*.ts\" vitest.config.ts",
     "lint:js": "eslint \"packages/*/{test,src}/**/*.ts\"",
-		"release:version": "changeset version",
-		"release:publish": "changeset publish"
+    "release:version": "changeset version",
+    "release:publish": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
