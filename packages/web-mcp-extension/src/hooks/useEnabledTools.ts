@@ -102,6 +102,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
         source,
         domains: entry.domains,
         pathPatterns: entry.pathPatterns,
+        queryParams: entry.queryParams,
         description: entry.description
       };
 
@@ -201,6 +202,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
             source: result.value.source,
             domains: tool.domains,
             pathPatterns: tool.pathPatterns,
+            queryParams: tool.queryParams,
             description: tool.description
           };
           updatedTools[compositeId] = {
@@ -334,6 +336,7 @@ export function useEnabledTools(): UseEnabledToolsReturn {
           source: result.value.source,
           domains: tool.domains,
           pathPatterns: tool.pathPatterns,
+          queryParams: tool.queryParams,
           description: tool.description
         };
         updatedTools[compositeId] = {

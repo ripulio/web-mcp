@@ -9,6 +9,7 @@ export interface CachedToolData {
   source: string;
   domains: string[];
   pathPatterns: string[];
+  queryParams: Record<string, string>;
   description: string;
 }
 
@@ -57,11 +58,22 @@ export const DEFAULT_SETTINGS: WebMCPSettings = {
   browserControlEnabled: false
 };
 
-export interface ToolFilter {
-  type: 'domain' | 'path';
-  domains?: string[];
-  patterns?: string[];
+export interface DomainFilter {
+  type: 'domain';
+  domains: string[];
 }
+
+export interface PathFilter {
+  type: 'path';
+  paths: string[];
+}
+
+export interface QueryFilter {
+  type: 'query';
+  parameters: Record<string, string>;
+}
+
+export type ToolFilter = DomainFilter | PathFilter | QueryFilter;
 
 export interface RemoteTool {
   id: string;
@@ -89,6 +101,7 @@ export interface ToolRegistryResult {
   description: string;
   domains: string[];
   pathPatterns: string[]; // multiple patterns supported
+  queryParams: Record<string, string>;
   sourceUrl: string;
   baseUrl: string;
   groupName: string;
