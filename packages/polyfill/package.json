@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A WebMCP browser polyfill.",
   "files": [
     "lib",
@@ -35,6 +35,5 @@
   "devDependencies": {
     "typescript": "^5.9.2"
   },
-  "dependencies": {
-  }
+  "dependencies": {}
 }
