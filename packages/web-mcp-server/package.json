@@ -1,6 +1,6 @@
 {
   "name": "@ripulio/web-mcp-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "bin": {
     "web-mcp-server": "bin.mjs"
   },
