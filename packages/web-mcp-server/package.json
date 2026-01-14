@@ -1,6 +1,9 @@
 {
   "name": "@ripul/web-mcp-server",
   "version": "0.0.1",
+  "bin": {
+    "web-mcp-server": "bin.mjs"
+  },
   "description": "A WebMCP MCP server.",
   "files": [
     "lib"
