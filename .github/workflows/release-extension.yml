@@ -10,9 +10,16 @@ jobs:
     permissions:
       contents: write
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+||||||| 7c8a13c
+=======
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+>>>>>>> origin/main
         with:
           node-version: 22
           cache: npm

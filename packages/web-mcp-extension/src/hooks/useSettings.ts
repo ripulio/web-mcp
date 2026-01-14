@@ -1,6 +1,13 @@
 import {useState, useEffect} from 'preact/hooks';
-import type {WebMCPSettings} from '../shared.js';
-import {DEFAULT_SETTINGS, LOCAL_SOURCE} from '../shared.js';
+import type {WebMCPSettings, PackageSource} from '../shared.js';
+import {DEFAULT_SETTINGS, DEFAULT_PACKAGE_SOURCE} from '../shared.js';
+
+// Helper function to derive sources array from settings
+export function deriveSourcesFromSettings(
+  settings: WebMCPSettings
+): PackageSource[] {
+  return [DEFAULT_PACKAGE_SOURCE, ...settings.customSources];
+}
 
 export interface UseSettingsReturn {
   settings: WebMCPSettings;
@@ -21,26 +28,7 @@ export function useSettings(): UseSettingsReturn {
       }>(['webmcpSettings']);
 
       const storedSettings = result.webmcpSettings || DEFAULT_SETTINGS;
-
-      // Ensure LOCAL_SOURCE is always present and up-to-date
-      const storedLocalSource = storedSettings.packageSources.find(
-        (s) => s.type === 'local' || s.url === 'local'
-      );
-      const nonLocalSources = storedSettings.packageSources.filter(
-        (s) => s.type !== 'local' && s.url !== 'local'
-      );
-      // Preserve user's settings, use LOCAL_SOURCE for base fields
-      const localSource = {
-        ...LOCAL_SOURCE,
-        enabled: storedLocalSource?.enabled ?? LOCAL_SOURCE.enabled,
-        autoEnable: storedLocalSource?.autoEnable
-      };
-      const mergedSettings: WebMCPSettings = {
-        ...storedSettings,
-        packageSources: [localSource, ...nonLocalSources]
-      };
-
-      setSettings(mergedSettings);
+      setSettings(storedSettings);
       setLoading(false);
     })();
   }, []);

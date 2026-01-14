@@ -1,10 +1,10 @@
 // Reference to an enabled tool - just identifies which tool is enabled
 export interface StoredTool {
   name: string;
-  sourceUrl: string; // 'local' or remote source URL
+  sourceUrl: string; // remote source URL
 }
 
-// Full tool data cached for injection (both local and remote tools)
+// Full tool data cached for injection
 export interface CachedToolData {
   source: string;
   domains: string[];
@@ -13,7 +13,7 @@ export interface CachedToolData {
   description: string;
 }
 
-// Unified cache for ALL enabled tools (local and remote)
+// Unified cache for ALL enabled tools
 export interface ToolCache {
   [sourceUrl: string]: {
     [toolName: string]: CachedToolData;
@@ -44,15 +44,8 @@ export interface DisabledGroups {
   [groupId: string]: true; // groupId = `${sourceUrl}:${groupName}`
 }
 
-export const LOCAL_SOURCE: PackageSource = {
-  url: 'local',
-  name: 'Local Tools',
-  type: 'local',
-  enabled: false
-};
-
 export interface WebMCPSettings {
-  packageSources: PackageSource[];
+  customSources: PackageSource[];
   browserControlEnabled: boolean;
 }
 
@@ -61,7 +54,7 @@ export const DEFAULT_PACKAGE_SOURCE: PackageSource = {
 };
 
 export const DEFAULT_SETTINGS: WebMCPSettings = {
-  packageSources: [LOCAL_SOURCE, DEFAULT_PACKAGE_SOURCE],
+  customSources: [],
   browserControlEnabled: false
 };
 
@@ -129,29 +122,6 @@ export interface GroupedToolRegistryResult {
 
 export interface ManifestCache {
   [sourceUrl: string]: ManifestCacheEntry;
-}
-
-// Types for browsed local tools (from directory picker)
-export interface BrowsedToolGroup {
-  id: string;
-  name: string;
-  description: string;
-  tools: string[];
-}
-
-export interface BrowsedTool {
-  id: string;
-  description: string;
-  filters: ToolFilter[];
-  groupId: string;
-  source: string;
-}
-
-export interface BrowsedToolsData {
-  directoryName: string;
-  lastUpdated: number;
-  groups: BrowsedToolGroup[];
-  tools: BrowsedTool[];
 }
 
 // Types for tool invocation tracking in popup

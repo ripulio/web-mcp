@@ -43,7 +43,7 @@ export function BrowserControlSection({
           <span class="toggle-slider"></span>
         </label>
         <span class="browser-control-label">
-          {enabled ? 'Enabled' : 'Disabled'}
+          Enable Browser Control
         </span>
         {enabled && connectedPorts.length > 0 && (
           <span class="browser-control-status">
