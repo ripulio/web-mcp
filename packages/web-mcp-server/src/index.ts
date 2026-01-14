@@ -121,7 +121,7 @@ async function handleBrowserAction(
 
 const server = new Server(
   {
-    name: 'browser-mcp',
+    name: 'web-mcp-server',
     version: '1.0.0'
   },
   {
