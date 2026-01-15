@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.1.3
+
+### Patch Changes
+
+- c764f30: Remove unused legacy code from extension.
+
 ## 0.1.2
 
 ### Patch Changes
