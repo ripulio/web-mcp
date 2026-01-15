@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.1.1
+
+### Patch Changes
+
+- 1ef9661: Remove unused local tool types.
+
 ## 0.1.0
 
 ### Minor Changes
