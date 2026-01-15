@@ -1,4 +1,5 @@
 import type {ToolRegistryResult} from '../shared.js';
+import {handleToolToggle} from '../stores/enabledToolsStore.js';
 
 export interface ToolEntryProps {
   entry: ToolRegistryResult;
@@ -8,7 +9,6 @@ export interface ToolEntryProps {
   isDescExpanded: boolean;
   isOverflowing: boolean;
   descriptionRef: (el: HTMLSpanElement | null) => void;
-  onToggle: () => void;
   onToggleDescription: () => void;
 }
 
@@ -20,7 +20,6 @@ export function ToolEntry({
   isDescExpanded,
   isOverflowing,
   descriptionRef,
-  onToggle,
   onToggleDescription
 }: ToolEntryProps) {
   return (
@@ -50,7 +49,7 @@ export function ToolEntry({
               <input
                 type="checkbox"
                 checked={isEnabled}
-                onChange={onToggle}
+                onChange={() => handleToolToggle(entry)}
                 disabled={isFetching}
               />
               <span class="toggle-slider"></span>

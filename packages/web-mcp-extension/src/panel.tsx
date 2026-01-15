@@ -1,61 +1,43 @@
 import {render} from 'preact';
 import {useEffect} from 'preact/hooks';
-
 import {
-  useSettings,
-  deriveSourcesFromSettings,
-} from './hooks/useSettings.js';
-import {
-  useToolRegistry,
-} from './hooks/useToolRegistry.js';
-import {
-  useEnabledTools,
-} from './hooks/useEnabledTools.js';
-import {
-  useToolSearch,
-} from './hooks/useToolSearch.js';
-import {
-  useExpandableUI,
-} from './hooks/useExpandableUI.js';
-import {
-  useBrowserControlStatus
-} from './hooks/useBrowserControlStatus.js';
-
-import {
-  ToolsSection,
-} from './components/ToolsSection.js';
-import {
-  BrowserControlSection
-} from './components/BrowserControlSection.js';
-import {
-  CustomSourcesSection
-} from './components/CustomSourcesSection.js';
+  settings,
+  settingsLoading,
+  derivedSources,
+  loadSettings
+} from './stores/settingsStore.js';
+import {loadRegistry} from './stores/registryStore.js';
+import {loadEnabledTools} from './stores/enabledToolsStore.js';
+import {initBrowserControlPolling} from './stores/browserControlStore.js';
+import {initOverflowDetection} from './stores/uiStore.js';
+import {ToolsSection} from './components/ToolsSection.js';
+import {BrowserControlSection} from './components/BrowserControlSection.js';
+import {CustomSourcesSection} from './components/CustomSourcesSection.js';
 
 function Panel() {
-  // Initialize hooks
-  const settingsHook = useSettings();
-  const registryHook = useToolRegistry();
-  const enabledToolsHook = useEnabledTools();
-  const searchHook = useToolSearch();
-  const expandableHook = useExpandableUI(registryHook.activeRegistry);
-  const browserControlStatus = useBrowserControlStatus();
+  // Initialize stores on mount
+  useEffect(() => {
+    loadSettings();
+    loadEnabledTools();
+
+    const cleanupPolling = initBrowserControlPolling();
+    const cleanupOverflow = initOverflowDetection();
+
+    return () => {
+      cleanupPolling();
+      cleanupOverflow();
+    };
+  }, []);
 
   // Reload registry when settings change
   useEffect(() => {
-    if (!settingsHook.loading) {
-      const sources = deriveSourcesFromSettings(settingsHook.settings);
-      registryHook.loadRegistry(sources);
+    if (!settingsLoading.value) {
+      loadRegistry(derivedSources.value);
     }
-  }, [
-    settingsHook.loading,
-    settingsHook.settings.customSources
-  ]);
-
-  // Filter registry based on search
-  const filteredRegistry = searchHook.filterRegistry(registryHook.activeRegistry);
+  }, [settingsLoading.value, settings.value.customSources]);
 
   // Loading state
-  if (settingsHook.loading) {
+  if (settingsLoading.value) {
     return (
       <div class="panel">
         <div class="panel-header">
@@ -74,42 +56,9 @@ function Panel() {
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
       <div class="panel-content">
-        {/* Browser Control MCP Server Section */}
-        <BrowserControlSection
-          enabled={settingsHook.browserControlEnabled}
-          connectedPorts={browserControlStatus.status.connectedPorts}
-          onToggle={settingsHook.handleBrowserControlToggle}
-        />
-
-        {/* Custom Sources Section */}
-        <CustomSourcesSection
-          customSources={settingsHook.settings.customSources}
-          onSourcesChange={(sources) => {
-            settingsHook.saveSettings({
-              ...settingsHook.settings,
-              customSources: sources
-            });
-          }}
-        />
-
-        {/* Tools Section */}
-        <ToolsSection
-          filteredRegistry={filteredRegistry}
-          searchQuery={searchHook.searchQuery}
-          onSearchChange={searchHook.setSearchQuery}
-          enabledTools={enabledToolsHook.enabledTools}
-          fetchingIds={enabledToolsHook.fetchingIds}
-          fetchErrors={enabledToolsHook.fetchErrors}
-          expandedGroups={expandableHook.expandedGroups}
-          expandedDescriptions={expandableHook.expandedDescriptions}
-          overflowingDescriptions={expandableHook.overflowingDescriptions}
-          descriptionRefs={expandableHook.descriptionRefs}
-          getGroupToggleState={enabledToolsHook.getGroupToggleState}
-          onToggleGroup={expandableHook.toggleGroup}
-          onGroupToggle={enabledToolsHook.handleGroupToggle}
-          onToolToggle={enabledToolsHook.handleToolToggle}
-          onToggleDescription={expandableHook.toggleDescription}
-        />
+        <BrowserControlSection />
+        <CustomSourcesSection />
+        <ToolsSection />
       </div>
     </div>
   );

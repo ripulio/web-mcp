@@ -1,17 +1,12 @@
 import {useState} from 'preact/hooks';
 import type {PackageSource} from '../shared.js';
+import {settings, saveSettings} from '../stores/settingsStore.js';
 
-export interface CustomSourcesSectionProps {
-  customSources: PackageSource[];
-  onSourcesChange: (sources: PackageSource[]) => void;
-}
-
-export function CustomSourcesSection({
-  customSources,
-  onSourcesChange
-}: CustomSourcesSectionProps) {
+export function CustomSourcesSection() {
   const [newSourceUrl, setNewSourceUrl] = useState('');
   const [newSourceName, setNewSourceName] = useState('');
+
+  const customSources = settings.value.customSources;
 
   const handleAddSource = () => {
     if (!newSourceUrl.trim()) return;
@@ -21,21 +16,28 @@ export function CustomSourcesSection({
       name: newSourceName.trim() || undefined
     };
 
-    onSourcesChange([...customSources, newSource]);
+    saveSettings({
+      ...settings.value,
+      customSources: [...customSources, newSource]
+    });
     setNewSourceUrl('');
     setNewSourceName('');
   };
 
   const handleRemoveSource = (index: number) => {
     const updatedSources = customSources.filter((_, i) => i !== index);
-    onSourcesChange(updatedSources);
+    saveSettings({
+      ...settings.value,
+      customSources: updatedSources
+    });
   };
 
   return (
     <div class="settings-section">
       <h2 class="section-title">Custom Tool Sources</h2>
       <p class="section-desc">
-        Add custom sources for WebMCP tools. All sources must implement the WebMCP API.
+        Add custom sources for WebMCP tools. All sources must implement the
+        WebMCP API.
       </p>
 
       {/* Add new source form */}
@@ -45,14 +47,18 @@ export function CustomSourcesSection({
             type="text"
             placeholder="Source URL (e.g., http://localhost:8766)"
             value={newSourceUrl}
-            onInput={(e) => setNewSourceUrl((e.target as HTMLInputElement).value)}
+            onInput={(e) =>
+              setNewSourceUrl((e.currentTarget as HTMLInputElement).value)
+            }
             class="source-input"
           />
           <input
             type="text"
             placeholder="Name (optional)"
             value={newSourceName}
-            onInput={(e) => setNewSourceName((e.target as HTMLInputElement).value)}
+            onInput={(e) =>
+              setNewSourceName((e.currentTarget as HTMLInputElement).value)
+            }
             class="source-input"
           />
           <button
@@ -71,9 +77,7 @@ export function CustomSourcesSection({
           {customSources.map((source, index) => (
             <div key={index} class="custom-source-item">
               <div class="source-info">
-                <span class="source-name">
-                  {source.name || source.url}
-                </span>
+                <span class="source-name">{source.name || source.url}</span>
                 {source.name && (
                   <span class="source-url-secondary">{source.url}</span>
                 )}

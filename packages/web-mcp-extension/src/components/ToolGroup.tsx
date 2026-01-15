@@ -1,48 +1,42 @@
-import type {ToolGroupResult, ToolRegistryResult, EnabledTools} from '../shared.js';
-import type {GroupToggleState} from '../hooks/useEnabledTools.js';
-import type {DescriptionRefsType} from '../hooks/useExpandableUI.js';
+import type {ToolGroupResult} from '../shared.js';
+import type {GroupToggleState} from '../stores/enabledToolsStore.js';
+import {
+  enabledTools,
+  fetchingIds,
+  fetchErrors,
+  handleGroupToggle
+} from '../stores/enabledToolsStore.js';
+import {
+  expandedDescriptions,
+  overflowingDescriptions,
+  descriptionRefs,
+  toggleGroup,
+  toggleDescription
+} from '../stores/uiStore.js';
 import {ToolEntry} from './ToolEntry.js';
 
 export interface ToolGroupProps {
   group: ToolGroupResult;
   sourceUrl: string;
+  baseUrl: string;
   isExpanded: boolean;
   toggleState: GroupToggleState;
   isGroupFetching: boolean;
-  enabledTools: EnabledTools;
-  fetchingIds: Set<string>;
-  fetchErrors: {[id: string]: string};
-  expandedDescriptions: Set<string>;
-  overflowingDescriptions: Set<string>;
-  descriptionRefs: DescriptionRefsType;
-  onToggleGroup: (groupId: string) => void;
-  onGroupToggle: () => void;
-  onToolToggle: (entry: ToolRegistryResult) => void;
-  onToggleDescription: (key: string) => void;
 }
 
 export function ToolGroup({
   group,
   sourceUrl,
+  baseUrl,
   isExpanded,
   toggleState,
-  isGroupFetching,
-  enabledTools,
-  fetchingIds,
-  fetchErrors,
-  expandedDescriptions,
-  overflowingDescriptions,
-  descriptionRefs,
-  onToggleGroup,
-  onGroupToggle,
-  onToolToggle,
-  onToggleDescription
+  isGroupFetching
 }: ToolGroupProps) {
   const groupId = `${sourceUrl}:${group.name}`;
 
   return (
     <div class="tool-group">
-      <div class="group-header" onClick={() => onToggleGroup(groupId)}>
+      <div class="group-header" onClick={() => toggleGroup(groupId)}>
         <span class={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
         <div class="group-info">
           <div class="group-title-row">
@@ -63,7 +57,7 @@ export function ToolGroup({
               <input
                 type="checkbox"
                 checked={toggleState !== 'none'}
-                onChange={onGroupToggle}
+                onChange={() => handleGroupToggle(group, sourceUrl, baseUrl)}
               />
               <span class="toggle-slider"></span>
             </label>
@@ -74,12 +68,12 @@ export function ToolGroup({
         <div class="tools-list">
           {group.tools.map((entry) => {
             const compositeId = `${entry.sourceUrl}:${entry.name}`;
-            const isEnabled = !!enabledTools[compositeId];
-            const isFetching = fetchingIds.has(compositeId);
-            const error = fetchErrors[compositeId];
+            const isEnabled = enabledTools.value[compositeId] !== undefined;
+            const isFetching = fetchingIds.value.has(compositeId);
+            const error = fetchErrors.value[compositeId];
             const descKey = compositeId;
-            const isDescExpanded = expandedDescriptions.has(descKey);
-            const isOverflowing = overflowingDescriptions.has(descKey);
+            const isDescExpanded = expandedDescriptions.value.has(descKey);
+            const isOverflowing = overflowingDescriptions.value.has(descKey);
 
             return (
               <ToolEntry
@@ -92,11 +86,10 @@ export function ToolGroup({
                 isOverflowing={isOverflowing}
                 descriptionRef={(el) => {
                   if (el) {
-                    descriptionRefs.current.set(descKey, el);
+                    descriptionRefs.set(descKey, el);
                   }
                 }}
-                onToggle={() => onToolToggle(entry)}
-                onToggleDescription={() => onToggleDescription(descKey)}
+                onToggleDescription={() => toggleDescription(descKey)}
               />
             );
           })}
