@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.1.2
+
+### Patch Changes
+
+- 0576944: Remove unused extension utilities.
+
 ## 0.1.1
 
 ### Patch Changes
