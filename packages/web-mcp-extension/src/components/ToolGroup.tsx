@@ -6,7 +6,6 @@ import {ToolEntry} from './ToolEntry.js';
 export interface ToolGroupProps {
   group: ToolGroupResult;
   sourceUrl: string;
-  baseUrl: string;
   isExpanded: boolean;
   toggleState: GroupToggleState;
   isGroupFetching: boolean;
