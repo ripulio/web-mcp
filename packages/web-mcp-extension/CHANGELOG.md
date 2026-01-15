@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.2.1
+
+### Patch Changes
+
+- 60c13dc: Fix plugin marketplace and install commands in setup instructions
+
 ## 0.2.0
 
 ### Minor Changes
