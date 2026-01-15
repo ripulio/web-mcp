@@ -1,5 +1,4 @@
 import type {ToolRegistryResult, GroupedToolRegistryResult} from '../shared.js';
-import {isUrl} from './format.js';
 
 /**
  * Check if a tool matches a search query
@@ -7,7 +6,7 @@ import {isUrl} from './format.js';
 export function matchesTool(tool: ToolRegistryResult, query: string): boolean {
   const q = query.toLowerCase().trim();
 
-  if (isUrl(q)) {
+  if (URL.canParse(q)) {
     try {
       const url = new URL(q.startsWith('www.') ? `https://${q}` : q);
       return tool.domains.some(
