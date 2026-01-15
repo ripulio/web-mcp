@@ -1,5 +1,6 @@
 {
   "name": "webmcp-skill",
   "version": "0.0.1",
-  "description": "Instructions for using navigator.modelContext API in web pages"
+  "description": "Instructions for using navigator.modelContext API in web pages",
+  "skills": "./skills/"
 }
