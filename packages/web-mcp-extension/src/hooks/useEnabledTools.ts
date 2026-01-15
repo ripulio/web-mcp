@@ -8,7 +8,6 @@ import type {
   CachedToolData,
   DisabledTools,
   DisabledGroups,
-  GroupedToolRegistryResult
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
 
@@ -30,11 +29,6 @@ export interface UseEnabledToolsReturn {
     group: ToolGroupResult,
     sourceUrl: string
   ) => GroupToggleState;
-  autoEnableTools: (
-    sourceUrl: string,
-    registry: GroupedToolRegistryResult,
-    baseUrl: string
-  ) => Promise<void>;
 }
 
 export function useEnabledTools(): UseEnabledToolsReturn {
@@ -276,93 +270,6 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     }
   };
 
-  // Auto-enable all tools from a source that aren't disabled
-  const autoEnableTools = async (
-    sourceUrl: string,
-    registry: GroupedToolRegistryResult,
-    baseUrl: string
-  ) => {
-    const toolsToEnable: ToolRegistryResult[] = [];
-
-    // Find tools that should be auto-enabled
-    for (const group of registry.groups) {
-      const groupId = `${sourceUrl}:${group.name}`;
-      // Skip if group is disabled
-      if (disabledGroups[groupId]) continue;
-
-      for (const tool of group.tools) {
-        const compositeId = `${sourceUrl}:${tool.name}`;
-        // Skip if already enabled or explicitly disabled
-        if (enabledTools[compositeId] || disabledTools[compositeId]) continue;
-        toolsToEnable.push(tool);
-      }
-    }
-
-    if (toolsToEnable.length === 0) return;
-
-    const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
-    const updatedTools = {...enabledTools};
-    const newErrors: {[id: string]: string} = {};
-
-    setFetchingIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-
-    // Get tool data and store in unified toolCache
-    const cacheResult = await chrome.storage.local.get<{
-      toolCache: ToolCache;
-    }>(['toolCache']);
-    const toolCache = cacheResult.toolCache || {};
-    if (!toolCache[sourceUrl]) {
-      toolCache[sourceUrl] = {};
-    }
-
-    const results = await Promise.allSettled(
-      toolsToEnable.map(async (tool) => {
-        const source = await fetchToolSource(baseUrl, tool.name);
-        return {tool, source};
-      })
-    );
-
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      const tool = toolsToEnable[i];
-      const compositeId = `${sourceUrl}:${tool.name}`;
-
-      if (result.status === 'fulfilled') {
-        toolCache[sourceUrl][tool.name] = {
-          source: result.value.source,
-          domains: tool.domains,
-          pathPatterns: tool.pathPatterns,
-          queryParams: tool.queryParams,
-          description: tool.description
-        };
-        updatedTools[compositeId] = {
-          name: tool.name,
-          sourceUrl
-        };
-      } else {
-        newErrors[compositeId] =
-          result.reason?.message || 'Failed to fetch tool';
-      }
-    }
-
-    await chrome.storage.local.set({toolCache});
-    setFetchingIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.delete(id));
-      return next;
-    });
-
-    setEnabledTools(updatedTools);
-    await chrome.storage.local.set({enabledToolGroups: updatedTools});
-    if (Object.keys(newErrors).length > 0) {
-      setFetchErrors((prev) => ({...prev, ...newErrors}));
-    }
-  };
-
   return {
     enabledTools,
     disabledTools,
@@ -371,7 +278,6 @@ export function useEnabledTools(): UseEnabledToolsReturn {
     fetchErrors,
     handleToolToggle,
     handleGroupToggle,
-    getGroupToggleState,
-    autoEnableTools
+    getGroupToggleState
   };
 }

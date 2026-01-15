@@ -81,7 +81,6 @@ export function ToolsSection({
                 key={groupId}
                 group={group}
                 sourceUrl={source.sourceUrl}
-                baseUrl={source.baseUrl}
                 isExpanded={isExpanded}
                 toggleState={toggleState}
                 isGroupFetching={isGroupFetching}

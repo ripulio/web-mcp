@@ -20,9 +20,6 @@ export interface ToolCache {
   };
 }
 
-// Legacy alias for migration - content.ts falls back to this
-export type SourceCache = ToolCache;
-
 export interface EnabledTools {
   [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`
 }
