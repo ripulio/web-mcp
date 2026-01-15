@@ -41,20 +41,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-      - name: Check if extension was published
+      - name: Get extension version
         if: steps.changesets.outputs.published
-        id: check-extension
+        id: extension-version
+        env:
+          PACKAGES: ${{ toJSON(steps.changesets.outputs.publishedPackages) }}
         run: |
-          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
           VERSION=$(echo "$PACKAGES" | jq -r '.[] | select(.name == "@ripulio/web-mcp-extension") | .version')
           if [ -n "$VERSION" ]; then
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload extension zip to release
-        if: steps.check-extension.outputs.version
+        if: steps.extension-version.outputs.version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd packages/web-mcp-extension
           zip -r ../../webmcp-extension.zip extension
-          gh release upload "@ripulio/web-mcp-extension@${{ steps.check-extension.outputs.version }}" ../../webmcp-extension.zip --clobber
+          gh release upload "@ripulio/web-mcp-extension@${{ steps.extension-version.outputs.version }}" ../../webmcp-extension.zip --clobber
