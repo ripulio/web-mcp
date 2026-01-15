@@ -42,7 +42,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
       - name: Check if extension was published
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published
         id: check-extension
         run: |
           PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'

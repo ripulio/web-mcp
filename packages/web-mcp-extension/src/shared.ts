@@ -124,29 +124,6 @@ export interface ManifestCache {
   [sourceUrl: string]: ManifestCacheEntry;
 }
 
-// Types for browsed local tools (from directory picker)
-export interface BrowsedToolGroup {
-  id: string;
-  name: string;
-  description: string;
-  tools: string[];
-}
-
-export interface BrowsedTool {
-  id: string;
-  description: string;
-  filters: ToolFilter[];
-  groupId: string;
-  source: string;
-}
-
-export interface BrowsedToolsData {
-  directoryName: string;
-  lastUpdated: number;
-  groups: BrowsedToolGroup[];
-  tools: BrowsedTool[];
-}
-
 // Types for tool invocation tracking in popup
 export interface ToolInvocation {
   id: string;
