@@ -7,7 +7,7 @@ import type {
   ToolCache,
   CachedToolData,
   DisabledTools,
-  DisabledGroups,
+  DisabledGroups
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
 
