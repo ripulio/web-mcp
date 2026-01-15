@@ -45,7 +45,7 @@ jobs:
         if: steps.changesets.outputs.published
         id: extension-version
         env:
-          PACKAGES: ${{ toJSON(steps.changesets.outputs.publishedPackages) }}
+          PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
         run: |
           VERSION=$(echo "$PACKAGES" | jq -r '.[] | select(.name == "@ripulio/web-mcp-extension") | .version')
           if [ -n "$VERSION" ]; then

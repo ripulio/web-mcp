@@ -1,14 +1,13 @@
-export interface BrowserControlSectionProps {
-  enabled: boolean;
-  connectedPorts: number[];
-  onToggle: (enabled: boolean) => void;
-}
+import {
+  browserControlEnabled,
+  handleBrowserControlToggle
+} from '../stores/settingsStore.js';
+import {browserControlStatus} from '../stores/browserControlStore.js';
 
-export function BrowserControlSection({
-  enabled,
-  connectedPorts,
-  onToggle
-}: BrowserControlSectionProps) {
+export function BrowserControlSection() {
+  const enabled = browserControlEnabled.value;
+  const connectedPorts = browserControlStatus.value.connectedPorts;
+
   return (
     <div class="settings-section">
       <h2 class="section-title">Browser Control MCP Server</h2>
@@ -38,13 +37,11 @@ export function BrowserControlSection({
           <input
             type="checkbox"
             checked={enabled}
-            onChange={() => onToggle(!enabled)}
+            onChange={() => handleBrowserControlToggle(!enabled)}
           />
           <span class="toggle-slider"></span>
         </label>
-        <span class="browser-control-label">
-          Enable Browser Control
-        </span>
+        <span class="browser-control-label">Enable Browser Control</span>
         {enabled && connectedPorts.length > 0 && (
           <span class="browser-control-status">
             Connected to {connectedPorts.length} server
