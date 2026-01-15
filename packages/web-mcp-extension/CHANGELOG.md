@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.2.0
+
+### Minor Changes
+
+- ef17a35: Rework the extension to use signals for state.
+
 ## 0.1.3
 
 ### Patch Changes
