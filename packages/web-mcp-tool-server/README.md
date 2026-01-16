@@ -11,8 +11,9 @@ npx @ripulio/web-mcp-tool-server [options] <directory>
 ### Options
 
 - `-p, --port <port>` - Port to listen on (default: 3000)
-- `-h, --host <host>` - Host to bind to (default: localhost)
+- `-H, --host <host>` - Host to bind to (default: localhost)
 - `-w, --watch` - Watch for file changes and reload
+- `-h, --help` - Show help message
 
 ### Example
 

@@ -26,19 +26,19 @@ function parseArgs(args: string[]): StartOptions {
       if (isNaN(options.port)) {
         throw new Error(`Invalid port: ${value}`);
       }
-    } else if (arg === '--host' || arg === '-h') {
+    } else if (arg === '--host' || arg === '-H') {
       options.host = args[++i];
     } else if (arg === '--watch' || arg === '-w') {
       options.watch = true;
-    } else if (arg === '--help') {
+    } else if (arg === '--help' || arg === '-h') {
       console.log(`
 Usage: web-mcp-tool-server [options] [directory]
 
 Options:
   -p, --port <port>  Port to listen on (default: 3000)
-  -h, --host <host>  Host to bind to (default: localhost)
+  -H, --host <host>  Host to bind to (default: localhost)
   -w, --watch        Watch for changes and reload
-  --help             Show this help message
+  -h, --help         Show this help message
 
 Arguments:
   directory          Directory containing tool groups (default: current directory)
