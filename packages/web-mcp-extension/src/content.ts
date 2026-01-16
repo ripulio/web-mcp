@@ -145,9 +145,9 @@ async function evaluateAndInjectTools() {
       queryParams: cached.queryParams || {}
     };
 
-    const domainMatches = toolData.domains.some(
-      (domain) => window.location.hostname === domain
-    );
+    const domainMatches =
+      toolData.domains.includes('*') ||
+      toolData.domains.some((domain) => window.location.hostname === domain);
     if (!domainMatches) {
       console.log(
         `[WebMCP] Tool "${toolRef.name}" skipped: domain mismatch (expected ${toolData.domains.join(', ')}, got ${window.location.hostname})`
