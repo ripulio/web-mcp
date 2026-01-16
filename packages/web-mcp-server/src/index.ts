@@ -48,18 +48,52 @@ async function handleBrowserAction(
           })
         )
       );
-      // Return tabs with freshly discovered tools (including descriptions)
-      const tabs = Array.from(state.tabs.values()).map((tab) => ({
+
+      const allTabs = Array.from(state.tabs.values());
+
+      // Find tools common to ALL tabs (only when 2+ tabs exist)
+      let globalToolNames = new Set<string>();
+      if (allTabs.length >= 2) {
+        // Start with all tool names from first tab
+        globalToolNames = new Set(allTabs[0].tools.map((t) => t.name));
+        // Intersect with each subsequent tab's tools
+        for (let i = 1; i < allTabs.length; i++) {
+          const tabToolNames = new Set(allTabs[i].tools.map((t) => t.name));
+          for (const name of globalToolNames) {
+            if (!tabToolNames.has(name)) {
+              globalToolNames.delete(name);
+            }
+          }
+        }
+      }
+
+      // Build globalTools array from first tab's tool objects
+      const globalTools =
+        allTabs.length >= 2 && globalToolNames.size > 0
+          ? allTabs[0].tools
+              .filter((t) => globalToolNames.has(t.name))
+              .map((t) => ({
+                name: t.name,
+                description: t.description,
+                inputSchema: t.inputSchema
+              }))
+          : [];
+
+      // Build tabs with only tab-specific tools (excluding global ones)
+      const tabs = allTabs.map((tab) => ({
         id: tab.id,
         title: tab.title,
         url: tab.url,
-        tools: tab.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema
-        }))
+        tools: tab.tools
+          .filter((t) => !globalToolNames.has(t.name))
+          .map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema
+          }))
       }));
-      return {tabs};
+
+      return {globalTools, tabs};
     }
 
     case 'open_tab': {
