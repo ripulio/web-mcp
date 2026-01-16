@@ -8,6 +8,46 @@ export interface LoadedCatalog {
   sources: Map<string, string>;
 }
 
+function validateGroupMeta(data: unknown, filePath: string): ToolRegistryMeta {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error(`Invalid group metadata in ${filePath}: expected object`);
+  }
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.id !== 'string') {
+    throw new Error(`Invalid group metadata in ${filePath}: missing or invalid 'id'`);
+  }
+  if (typeof obj.name !== 'string') {
+    throw new Error(`Invalid group metadata in ${filePath}: missing or invalid 'name'`);
+  }
+  if (typeof obj.description !== 'string') {
+    throw new Error(`Invalid group metadata in ${filePath}: missing or invalid 'description'`);
+  }
+  if (!Array.isArray(obj.tools)) {
+    throw new Error(`Invalid group metadata in ${filePath}: missing or invalid 'tools' array`);
+  }
+  return {
+    id: obj.id,
+    name: obj.name,
+    description: obj.description,
+    tools: obj.tools as string[]
+  };
+}
+
+function validateToolMeta(data: unknown, filePath: string): ToolMetadata {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error(`Invalid tool metadata in ${filePath}: expected object`);
+  }
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.id !== 'string') {
+    throw new Error(`Invalid tool metadata in ${filePath}: missing or invalid 'id'`);
+  }
+  return {
+    id: obj.id,
+    description: typeof obj.description === 'string' ? obj.description : undefined,
+    filters: Array.isArray(obj.filters) ? obj.filters : undefined
+  };
+}
+
 export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
   const groups = new Map<string, ToolRegistryMeta>();
   const tools = new Map<string, ToolMetadata>();
@@ -22,13 +62,9 @@ export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
     const groupMetaPath = path.join(groupDir, `${entry.name}.meta.json`);
 
     try {
-      const groupMeta = JSON.parse(await fs.readFile(groupMetaPath, 'utf-8'));
-      groups.set(groupMeta.id, {
-        id: groupMeta.id,
-        name: groupMeta.name,
-        description: groupMeta.description,
-        tools: groupMeta.tools
-      });
+      const rawGroupMeta = JSON.parse(await fs.readFile(groupMetaPath, 'utf-8'));
+      const groupMeta = validateGroupMeta(rawGroupMeta, groupMetaPath);
+      groups.set(groupMeta.id, groupMeta);
     } catch (err) {
       console.warn(`Failed to load group metadata from ${groupMetaPath}:`, err);
       continue;
@@ -45,12 +81,9 @@ export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
       const sourcePath = path.join(groupDir, `${toolId}.js`);
 
       try {
-        const toolMeta = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
-        tools.set(toolMeta.id, {
-          id: toolMeta.id,
-          description: toolMeta.description,
-          filters: toolMeta.filters
-        });
+        const rawToolMeta = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
+        const toolMeta = validateToolMeta(rawToolMeta, metaPath);
+        tools.set(toolMeta.id, toolMeta);
 
         const source = await fs.readFile(sourcePath, 'utf-8');
         sources.set(toolMeta.id, source);
