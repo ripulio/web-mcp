@@ -1,10 +1,18 @@
 import {signal} from '@preact/signals';
-import type {PackageSource, GroupedToolRegistryResult} from '../shared.js';
+import type {
+  PackageSource,
+  GroupedToolRegistryResult,
+  ToolRegistryResult
+} from '../shared.js';
 import {
   searchToolsGrouped,
   fetchVersion,
   clearSessionCache
 } from '../tool-registry.js';
+import {
+  autoEnableNewTools,
+  enabledTools
+} from './enabledToolsStore.js';
 
 // Core signals
 export const activeRegistry = signal<GroupedToolRegistryResult[]>([]);
@@ -52,6 +60,15 @@ export function removeFromRegistries(sourceUrl: string): void {
   );
 }
 
+// Helper to get all tools for a source from registry
+function getToolsForSource(sourceUrl: string): ToolRegistryResult[] {
+  const sourceRegistry = activeRegistry.value.find(
+    (r) => r.sourceUrl === sourceUrl
+  );
+  if (!sourceRegistry) return [];
+  return sourceRegistry.groups.flatMap((g) => g.tools);
+}
+
 // Hot reload functions
 export function startHotReload(
   source: PackageSource,
@@ -67,8 +84,28 @@ export function startHotReload(
     const lastVersion = lastKnownVersions.get(source.url);
 
     if (lastVersion && version !== lastVersion) {
+      // Snapshot current tools before reload (for auto-enable comparison)
+      const previousToolNames = new Set(
+        getToolsForSource(source.url).map((t) => t.name)
+      );
+
       clearSessionCache(source.url);
       await loadRegistry(allSources);
+
+      // Auto-enable new tools if configured
+      if (source.autoEnable) {
+        const currentTools = getToolsForSource(source.url);
+        const newTools = currentTools.filter(
+          (t) =>
+            !previousToolNames.has(t.name) &&
+            !enabledTools.value[`${source.url}:${t.name}`]
+        );
+
+        if (newTools.length > 0) {
+          const baseUrl = source.url.replace(/\/$/, '');
+          await autoEnableNewTools(source.url, baseUrl, newTools);
+        }
+      }
     }
     lastKnownVersions.set(source.url, version);
   }, 3000);

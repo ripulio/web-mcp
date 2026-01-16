@@ -252,3 +252,77 @@ export async function handleGroupToggle(
     });
   }
 }
+
+/**
+ * Auto-enable new tools from a source (respects disabledTools).
+ * Called by hot reload when autoEnable is set for a source.
+ */
+export async function autoEnableNewTools(
+  sourceUrl: string,
+  baseUrl: string,
+  newTools: ToolRegistryResult[]
+): Promise<void> {
+  // Filter out tools that are explicitly disabled
+  const toolsToEnable = newTools.filter((tool) => {
+    const compositeId = `${sourceUrl}:${tool.name}`;
+    return !disabledTools.value[compositeId];
+  });
+
+  if (toolsToEnable.length === 0) return;
+
+  const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
+  const updatedTools = {...enabledTools.value};
+
+  const newFetching = new Set(fetchingIds.value);
+  ids.forEach((id) => newFetching.add(id));
+  fetchingIds.value = newFetching;
+
+  // Get tool data and store in unified toolCache
+  const cacheResult = await chrome.storage.local.get<{
+    toolCache: ToolCache;
+  }>(['toolCache']);
+  const toolCache = cacheResult.toolCache || {};
+  if (!toolCache[sourceUrl]) {
+    toolCache[sourceUrl] = {};
+  }
+
+  // Fetch sources from server
+  const results = await Promise.allSettled(
+    toolsToEnable.map(async (tool) => {
+      const source = await fetchToolSource(baseUrl, tool.name);
+      return {tool, source};
+    })
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const tool = toolsToEnable[i];
+    const compositeId = `${sourceUrl}:${tool.name}`;
+
+    if (result.status === 'fulfilled') {
+      toolCache[sourceUrl][tool.name] = {
+        source: result.value.source,
+        domains: tool.domains,
+        pathPatterns: tool.pathPatterns,
+        queryParams: tool.queryParams,
+        description: tool.description
+      };
+      updatedTools[compositeId] = {
+        name: tool.name,
+        sourceUrl
+      };
+    }
+    // Silently skip failed fetches
+  }
+
+  await chrome.storage.local.set({toolCache});
+
+  const nextFetching = new Set(fetchingIds.value);
+  ids.forEach((id) => nextFetching.delete(id));
+  fetchingIds.value = nextFetching;
+
+  enabledTools.value = updatedTools;
+  await chrome.storage.local.set({
+    enabledToolGroups: updatedTools
+  });
+}
