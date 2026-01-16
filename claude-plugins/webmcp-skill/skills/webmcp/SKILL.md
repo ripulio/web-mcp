@@ -64,7 +64,7 @@ return await navigator.modelContext.executeTool('tool-name', {
 
 Tool results follow this structure:
 
-```typescript
+```ts
 {
   content: [
     { type: 'text', text: '...' },
