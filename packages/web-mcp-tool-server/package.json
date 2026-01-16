@@ -11,6 +11,7 @@
   "files": [
     "lib",
     "bin.mjs",
+    "LICENSE",
     "!*.map"
   ],
   "keywords": [
@@ -31,6 +32,12 @@
   "author": "James Garbutt (https://github.com/43081j)",
   "type": "module",
   "main": "lib/main.js",
+  "exports": {
+    ".": {
+      "types": "./lib/main.d.ts",
+      "default": "./lib/main.js"
+    }
+  },
   "scripts": {
     "build:typecheck": "tsc -p tsconfig.test.json",
     "build:js": "tsc",
