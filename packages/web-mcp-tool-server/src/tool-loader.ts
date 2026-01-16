@@ -29,7 +29,8 @@ export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
         description: groupMeta.description,
         tools: groupMeta.tools
       });
-    } catch {
+    } catch (err) {
+      console.warn(`Failed to load group metadata from ${groupMetaPath}:`, err);
       continue;
     }
 
@@ -53,7 +54,8 @@ export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
 
         const source = await fs.readFile(sourcePath, 'utf-8');
         sources.set(toolMeta.id, source);
-      } catch {
+      } catch (err) {
+        console.warn(`Failed to load tool from ${metaPath}:`, err);
         continue;
       }
     }
@@ -70,15 +72,20 @@ export function watchCatalog(
   const {signal} = ac;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastChangedFile: string | null = null;
 
   const reload = async (): Promise<void> => {
+    if (lastChangedFile) {
+      console.log(`File changed: ${lastChangedFile}`);
+    }
     const catalog = await loadCatalog(directory);
     onChange(catalog);
   };
 
   (async () => {
     const watcher = fs.watch(directory, {recursive: true, signal});
-    for await (const _event of watcher) {
+    for await (const event of watcher) {
+      lastChangedFile = event.filename;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
