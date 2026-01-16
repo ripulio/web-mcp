@@ -30,6 +30,7 @@ export interface PackageSource {
   type?: 'remote' | 'local';
   enabled?: boolean; // defaults to true
   autoEnable?: boolean; // auto-enable new tools on refresh, defaults to false
+  hotReload?: boolean; // poll for changes every 3 seconds, defaults to false
 }
 
 // Tools/groups explicitly disabled by user (respected by auto-enable)

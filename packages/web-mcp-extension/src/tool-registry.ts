@@ -19,6 +19,30 @@ type CacheMode = 'none' | 'session';
 // Session cache (in-memory)
 const sessionCache: ManifestCache = {};
 
+interface VersionResponse {
+  version: string;
+  updatedAt: number;
+}
+
+export async function fetchVersion(
+  baseUrl: string
+): Promise<VersionResponse | null> {
+  try {
+    const url = `${baseUrl.replace(/\/$/, '')}/version`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export function clearSessionCache(sourceUrl: string): void {
+  delete sessionCache[sourceUrl];
+}
+
 interface ToolGroupResponse {
   name: string;
   description: string;

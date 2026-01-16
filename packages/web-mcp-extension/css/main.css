@@ -934,3 +934,55 @@ body {
   font-size: 0.875rem;
   text-align: center;
 }
+
+/* Hot Reload Button */
+.hot-reload-btn {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #999;
+  line-height: 1;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.hot-reload-btn:hover {
+  color: #666;
+  border-color: #ccc;
+}
+
+.hot-reload-btn.active {
+  color: #2196F3;
+  border-color: #2196F3;
+  animation: hot-reload-spin 1s linear infinite;
+}
+
+@keyframes hot-reload-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Auto-enable Button */
+.auto-enable-btn {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #999;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.auto-enable-btn:hover {
+  color: #666;
+  border-color: #ccc;
+}
+
+.auto-enable-btn.active {
+  color: #4CAF50;
+  border-color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.1);
+}

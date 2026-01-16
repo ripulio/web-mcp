@@ -6,7 +6,7 @@ import {
   derivedSources,
   loadSettings
 } from './stores/settingsStore.js';
-import {loadRegistry} from './stores/registryStore.js';
+import {loadRegistry, initHotReloadFromSettings} from './stores/registryStore.js';
 import {loadEnabledTools} from './stores/enabledToolsStore.js';
 import {initBrowserControlPolling} from './stores/browserControlStore.js';
 import {initOverflowDetection} from './stores/uiStore.js';
@@ -33,6 +33,7 @@ function Panel() {
   useEffect(() => {
     if (!settingsLoading.value) {
       loadRegistry(derivedSources.value);
+      initHotReloadFromSettings(derivedSources.value);
     }
   }, [settingsLoading.value, settings.value.customSources]);
 

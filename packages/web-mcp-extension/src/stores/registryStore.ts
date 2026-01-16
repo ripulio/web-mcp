@@ -1,11 +1,20 @@
 import {signal} from '@preact/signals';
 import type {PackageSource, GroupedToolRegistryResult} from '../shared.js';
-import {searchToolsGrouped} from '../tool-registry.js';
+import {
+  searchToolsGrouped,
+  fetchVersion,
+  clearSessionCache
+} from '../tool-registry.js';
 
 // Core signals
 export const activeRegistry = signal<GroupedToolRegistryResult[]>([]);
 export const sourceErrors = signal<{[url: string]: string}>({});
 export const registryLoading = signal(true);
+
+// Hot reload state
+const pollIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const lastKnownVersions = new Map<string, string>();
+export const hotReloadingSources = signal<Set<string>>(new Set());
 
 // Actions
 export async function loadRegistry(sources: PackageSource[]): Promise<void> {
@@ -41,4 +50,59 @@ export function removeFromRegistries(sourceUrl: string): void {
   activeRegistry.value = activeRegistry.value.filter(
     (r) => r.sourceUrl !== sourceUrl
   );
+}
+
+// Hot reload functions
+export function startHotReload(
+  source: PackageSource,
+  allSources: PackageSource[]
+): void {
+  if (pollIntervals.has(source.url)) return;
+
+  const interval = setInterval(async () => {
+    const versionResponse = await fetchVersion(source.url);
+    if (!versionResponse) return;
+
+    const {version} = versionResponse;
+    const lastVersion = lastKnownVersions.get(source.url);
+
+    if (lastVersion && version !== lastVersion) {
+      clearSessionCache(source.url);
+      await loadRegistry(allSources);
+    }
+    lastKnownVersions.set(source.url, version);
+  }, 3000);
+
+  pollIntervals.set(source.url, interval);
+
+  // Update the signal
+  const newSet = new Set(hotReloadingSources.value);
+  newSet.add(source.url);
+  hotReloadingSources.value = newSet;
+}
+
+export function stopHotReload(sourceUrl: string): void {
+  const interval = pollIntervals.get(sourceUrl);
+  if (interval) {
+    clearInterval(interval);
+    pollIntervals.delete(sourceUrl);
+    lastKnownVersions.delete(sourceUrl);
+
+    // Update the signal
+    const newSet = new Set(hotReloadingSources.value);
+    newSet.delete(sourceUrl);
+    hotReloadingSources.value = newSet;
+  }
+}
+
+export function isHotReloading(sourceUrl: string): boolean {
+  return hotReloadingSources.value.has(sourceUrl);
+}
+
+export function initHotReloadFromSettings(allSources: PackageSource[]): void {
+  for (const source of allSources) {
+    if (source.hotReload && !pollIntervals.has(source.url)) {
+      startHotReload(source, allSources);
+    }
+  }
 }
