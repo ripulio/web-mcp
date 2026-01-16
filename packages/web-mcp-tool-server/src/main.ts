@@ -23,8 +23,8 @@ function parseArgs(args: string[]): StartOptions {
     if (arg === '--port' || arg === '-p') {
       const value = args[++i];
       options.port = parseInt(value, 10);
-      if (isNaN(options.port)) {
-        throw new Error(`Invalid port: ${value}`);
+      if (isNaN(options.port) || options.port < 1 || options.port > 65535) {
+        throw new Error(`Invalid port: ${value} (must be 1-65535)`);
       }
     } else if (arg === '--host' || arg === '-H') {
       options.host = args[++i];
