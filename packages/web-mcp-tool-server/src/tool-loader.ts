@@ -6,6 +6,8 @@ export interface LoadedCatalog {
   groups: Map<string, ToolRegistryMeta>;
   tools: Map<string, ToolMetadata>;
   sources: Map<string, string>;
+  version: string;
+  updatedAt: number;
 }
 
 function validateGroupMeta(data: unknown, filePath: string): ToolRegistryMeta {
@@ -94,7 +96,8 @@ export async function loadCatalog(directory: string): Promise<LoadedCatalog> {
     }
   }
 
-  return {groups, tools, sources};
+  const updatedAt = Date.now();
+  return {groups, tools, sources, version: String(updatedAt), updatedAt};
 }
 
 export function watchCatalog(

@@ -53,6 +53,11 @@ export function createServer(options: ServerOptions): http.Server {
 
     const catalog = getCatalog();
 
+    if (pathname === '/api/version') {
+      sendJson(res, {version: catalog.version, updatedAt: catalog.updatedAt});
+      return;
+    }
+
     if (pathname === '/api/groups') {
       const groups = Array.from(catalog.groups.values());
       sendJson(res, groups);
