@@ -35,31 +35,44 @@ async function handleBrowserAction(
   switch (action) {
     case 'list_tabs': {
       await ensureConnected();
-      // Discover tools for all tabs in parallel
-      const tabIds = Array.from(state.tabs.keys());
-      await Promise.all(
-        tabIds.map((tabId) =>
-          discoverToolsForTab(tabId, DEFAULT_SESSION_ID).catch((err) => {
-            console.error(
-              `Failed to discover tools for tab ${tabId}:`,
-              err.message
-            );
-            return [];
-          })
-        )
-      );
-      // Return tabs with freshly discovered tools (including descriptions)
+
+      // Return tabs without tools (use get_tab to get tools)
       const tabs = Array.from(state.tabs.values()).map((tab) => ({
         id: tab.id,
         title: tab.title,
-        url: tab.url,
-        tools: tab.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema
-        }))
+        url: tab.url
       }));
       return {tabs};
+    }
+
+    case 'get_tab': {
+      await ensureConnected();
+      const tabId = params.tabId as number;
+      if (tabId === undefined) {
+        throw new Error('tabId parameter is required for get_tab');
+      }
+      if (!state.tabs.has(tabId)) {
+        throw new Error(`Tab ${tabId} not found`);
+      }
+
+      // Discover tools for this tab
+      await discoverToolsForTab(tabId, DEFAULT_SESSION_ID).catch((err) => {
+        console.error(`Failed to discover tools for tab ${tabId}:`, err.message);
+      });
+
+      const tab = state.tabs.get(tabId)!;
+      return {
+        tab: {
+          id: tab.id,
+          title: tab.title,
+          url: tab.url,
+          tools: tab.tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema
+          }))
+        }
+      };
     }
 
     case 'open_tab': {
