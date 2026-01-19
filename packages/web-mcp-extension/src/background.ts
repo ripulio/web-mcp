@@ -490,9 +490,6 @@ async function handleOpenTab(
   requestId?: string,
   sessionId?: string
 ): Promise<void> {
-  const tab = await chrome.tabs.create({url, active: focus});
-  if (!tab.id) return;
-
   const isRestricted =
     !url ||
     url.startsWith('chrome://') ||
@@ -501,23 +498,44 @@ async function handleOpenTab(
     url.startsWith('edge://') ||
     url.startsWith('devtools://');
 
+  // Set up listener and promise BEFORE creating tab to avoid race condition
+  // where content script sends WEBMCP_TOOLS_READY before we're ready to receive it
+  let createdTabId: number | null = null;
+  let resolveReady: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    resolveReady = resolve;
+  });
+
+  const listener = (
+    message: {type?: string},
+    sender: chrome.runtime.MessageSender
+  ) => {
+    if (
+      message.type === 'WEBMCP_TOOLS_READY' &&
+      createdTabId !== null &&
+      sender.tab?.id === createdTabId
+    ) {
+      chrome.runtime.onMessage.removeListener(listener);
+      resolveReady();
+    }
+  };
+
   if (!isRestricted) {
-    // Wait for tools ready signal - temporary listener, no persistent state
-    await new Promise<void>((resolve) => {
-      const listener = (
-        message: {type?: string},
-        sender: chrome.runtime.MessageSender
-      ) => {
-        if (
-          message.type === 'WEBMCP_TOOLS_READY' &&
-          sender.tab?.id === tab.id
-        ) {
-          chrome.runtime.onMessage.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.runtime.onMessage.addListener(listener);
-    });
+    chrome.runtime.onMessage.addListener(listener);
+  }
+
+  const tab = await chrome.tabs.create({url, active: focus});
+  if (!tab.id) {
+    if (!isRestricted) {
+      chrome.runtime.onMessage.removeListener(listener);
+    }
+    return;
+  }
+
+  createdTabId = tab.id;
+
+  if (!isRestricted) {
+    await readyPromise;
   }
 
   const tools = await discoverPageTools(tab.id);
