@@ -32,6 +32,11 @@ let currentlyRegisteredTools = new Set<string>();
     window.addEventListener('message', listener);
   });
 
+  // Timeout in case injector fails to run (e.g., due to page CSP)
+  const injectorTimeout = new Promise<void>((resolve) => {
+    setTimeout(resolve, 5000);
+  });
+
   // Listen for tool invocation events from MAIN world and relay to background
   window.addEventListener('message', (event: MessageEvent) => {
     if (event.source !== window) return;
@@ -44,9 +49,17 @@ let currentlyRegisteredTools = new Set<string>();
     }
   });
 
-  // Inject polyfill first
-  await chrome.runtime.sendMessage({type: 'WEBMCP_INJECT_SCRIPT'});
-  await injectorReady;
+  // Inject polyfill first (with timeout in case it hangs)
+  try {
+    const injectPromise = chrome.runtime.sendMessage({type: 'WEBMCP_INJECT_SCRIPT'});
+    const injectTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Inject script timeout')), 5000)
+    );
+    await Promise.race([injectPromise, injectTimeout]);
+    await Promise.race([injectorReady, injectorTimeout]);
+  } catch (e) {
+    console.log('[WebMCP] Polyfill injection failed or timed out:', e);
+  }
 
   // Initial evaluation - always signal ready, even on error
   try {
