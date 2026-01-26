@@ -35,7 +35,7 @@
     "build": "npm run build:typecheck && npm run build:js"
   },
   "devDependencies": {
-    "@types/node": "^25.0.9",
+    "@types/node": "^25.0.10",
     "@types/ws": "^8.18.1",
     "typescript": "^5.9.2"
   },
