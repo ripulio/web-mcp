@@ -27,19 +27,64 @@ export function ToolEntry({
       <div class="registry-row">
         <div class="registry-info">
           <span class="registry-name">{entry.name}</span>
-          <span class="tool-group-badge">{entry.groupName}</span>
-          {entry.pathPatterns.length > 0 && (
-            <span class="tool-path-pattern">
-              {entry.pathPatterns.join(', ')}
-            </span>
-          )}
-          <div class="registry-domains">
-            {entry.domains.map((domain) => (
-              <span key={domain} class="domain-pill">
-                {domain}
-              </span>
-            ))}
+          <div class="tool-filters">
+            <div class="filter-row">
+              <span class="filter-label">Domains</span>
+              {entry.domains.includes('*') ? (
+                <span class="filter-pill">All domains</span>
+              ) : (
+                entry.domains.map((domain) => (
+                  <span key={domain} class="filter-pill">
+                    {domain}
+                  </span>
+                ))
+              )}
+            </div>
+            <div class="filter-row">
+              <span class="filter-label">Paths</span>
+              {entry.pathPatterns.length === 0 ||
+              entry.pathPatterns.includes('.*') ? (
+                <span class="filter-pill">All paths</span>
+              ) : (
+                entry.pathPatterns.map((pattern) => (
+                  <span key={pattern} class="filter-pill">
+                    {pattern}
+                  </span>
+                ))
+              )}
+            </div>
+            {Object.keys(entry.queryParams).length > 0 && (
+              <div class="filter-row">
+                <span class="filter-label">Query</span>
+                {Object.entries(entry.queryParams).map(([key, value]) => (
+                  <span key={key} class="filter-pill">
+                    {key}={value}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
+          {entry.description && (
+            <div class="tool-description-wrapper">
+              <span
+                class={`tool-description ${isDescExpanded ? 'expanded' : ''}`}
+                ref={descriptionRef}
+              >
+                {entry.description}
+              </span>
+              {(isOverflowing || isDescExpanded) && (
+                <button
+                  class="toggle-desc-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleDescription();
+                  }}
+                >
+                  {isDescExpanded ? 'show less' : 'show more'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div class="registry-actions">
           {isFetching ? (
@@ -57,27 +102,6 @@ export function ToolEntry({
           )}
         </div>
       </div>
-      {entry.description && (
-        <div class="tool-description-wrapper">
-          <span
-            class={`tool-description ${isDescExpanded ? 'expanded' : ''}`}
-            ref={descriptionRef}
-          >
-            {entry.description}
-          </span>
-          {(isOverflowing || isDescExpanded) && (
-            <button
-              class="toggle-desc-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleDescription();
-              }}
-            >
-              {isDescExpanded ? 'show less' : 'show more'}
-            </button>
-          )}
-        </div>
-      )}
       {error && <div class="fetch-error">{error}</div>}
     </div>
   );
