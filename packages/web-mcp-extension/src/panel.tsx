@@ -8,9 +8,10 @@ import {
 } from './stores/settingsStore.js';
 import {loadRegistry} from './stores/registryStore.js';
 import {loadEnabledTools} from './stores/enabledToolsStore.js';
+import {loadInstalledGroups} from './stores/installedToolsStore.js';
 import {initBrowserControlPolling} from './stores/browserControlStore.js';
-import {initOverflowDetection} from './stores/uiStore.js';
-import {ToolsSection} from './components/ToolsSection.js';
+import {InstalledSection} from './components/InstalledSection.js';
+import {SearchSection} from './components/SearchSection.js';
 import {BrowserControlSection} from './components/BrowserControlSection.js';
 import {CustomSourcesSection} from './components/CustomSourcesSection.js';
 
@@ -19,13 +20,12 @@ function Panel() {
   useEffect(() => {
     loadSettings();
     loadEnabledTools();
+    loadInstalledGroups();
 
     const cleanupPolling = initBrowserControlPolling();
-    const cleanupOverflow = initOverflowDetection();
 
     return () => {
       cleanupPolling();
-      cleanupOverflow();
     };
   }, []);
 
@@ -36,7 +36,7 @@ function Panel() {
     }
   }, [settingsLoading.value, settings.value.customSources]);
 
-  const [activeTab, setActiveTab] = useState<'tools' | 'advanced'>('tools');
+  const [activeTab, setActiveTab] = useState<'installed' | 'search' | 'advanced'>('installed');
 
   // Loading state
   if (settingsLoading.value) {
@@ -59,10 +59,16 @@ function Panel() {
       </div>
       <div class="panel-tabs">
         <button
-          class={`tab ${activeTab === 'tools' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tools')}
+          class={`tab ${activeTab === 'installed' ? 'active' : ''}`}
+          onClick={() => setActiveTab('installed')}
         >
-          Tools
+          Installed
+        </button>
+        <button
+          class={`tab ${activeTab === 'search' ? 'active' : ''}`}
+          onClick={() => setActiveTab('search')}
+        >
+          Search
         </button>
         <button
           class={`tab ${activeTab === 'advanced' ? 'active' : ''}`}
@@ -72,7 +78,8 @@ function Panel() {
         </button>
       </div>
       <div class="panel-content">
-        {activeTab === 'tools' && <ToolsSection />}
+        {activeTab === 'installed' && <InstalledSection />}
+        {activeTab === 'search' && <SearchSection />}
         {activeTab === 'advanced' && (
           <>
             <BrowserControlSection />

@@ -2,253 +2,126 @@ import {signal} from '@preact/signals';
 import type {
   EnabledTools,
   StoredTool,
-  ToolRegistryResult,
-  ToolGroupResult,
   ToolCache,
-  CachedToolData,
-  DisabledTools,
-  DisabledGroups
+  InstalledGroup
 } from '../shared.js';
 import {fetchToolSource} from '../tool-registry.js';
 
-export type GroupToggleState = 'all' | 'none' | 'partial';
-
 // Core signals
 export const enabledTools = signal<EnabledTools>({});
-export const disabledTools = signal<DisabledTools>({});
-export const disabledGroups = signal<DisabledGroups>({});
-export const fetchingIds = signal<Set<string>>(new Set());
+export const fetchingGroupIds = signal<Set<string>>(new Set());
 export const fetchErrors = signal<{[id: string]: string}>({});
 
 // Load from storage
 export async function loadEnabledTools(): Promise<void> {
   const result = await chrome.storage.local.get<{
     enabledToolGroups: EnabledTools;
-    disabledTools: DisabledTools;
-    disabledGroups: DisabledGroups;
-  }>(['enabledToolGroups', 'disabledTools', 'disabledGroups']);
+  }>(['enabledToolGroups']);
 
   enabledTools.value = result.enabledToolGroups || {};
-  disabledTools.value = result.disabledTools || {};
-  disabledGroups.value = result.disabledGroups || {};
 }
 
-// Computed-like function (takes parameters)
-export function getGroupToggleState(
-  group: ToolGroupResult,
-  sourceUrl: string
-): GroupToggleState {
-  const enabledCount = group.tools.filter((tool) => {
-    const compositeId = `${sourceUrl}:${tool.name}`;
+// Check if a group is enabled (all tools enabled)
+export function isGroupEnabled(group: InstalledGroup): boolean {
+  return group.tools.every((tool) => {
+    const compositeId = `${group.sourceUrl}:${tool.name}`;
     return !!enabledTools.value[compositeId];
-  }).length;
-
-  if (enabledCount === 0) return 'none';
-  if (enabledCount === group.tools.length) return 'all';
-  return 'partial';
-}
-
-// Actions
-export async function handleToolToggle(
-  entry: ToolRegistryResult
-): Promise<void> {
-  const compositeId = `${entry.sourceUrl}:${entry.name}`;
-  const storedTool = enabledTools.value[compositeId];
-
-  if (storedTool) {
-    // Disable - remove from enabledTools, add to disabledTools
-    const {[compositeId]: _, ...restEnabled} = enabledTools.value;
-    const updatedDisabled = {
-      ...disabledTools.value,
-      [compositeId]: true as const
-    };
-    enabledTools.value = restEnabled;
-    disabledTools.value = updatedDisabled;
-    await chrome.storage.local.set({
-      enabledToolGroups: restEnabled,
-      disabledTools: updatedDisabled
-    });
-    return;
-  }
-
-  // Enable - fetch tool data and store in unified toolCache
-  fetchingIds.value = new Set(fetchingIds.value).add(compositeId);
-  const {[compositeId]: __, ...restErrors} = fetchErrors.value;
-  fetchErrors.value = restErrors;
-
-  try {
-    // Fetch source from remote server
-    const source = await fetchToolSource(entry.baseUrl, entry.name);
-    const toolData: CachedToolData = {
-      source,
-      domains: entry.domains,
-      pathPatterns: entry.pathPatterns,
-      queryParams: entry.queryParams,
-      description: entry.description
-    };
-
-    // Store in unified toolCache
-    const cacheResult = await chrome.storage.local.get<{
-      toolCache: ToolCache;
-    }>(['toolCache']);
-    const toolCache = cacheResult.toolCache || {};
-    if (!toolCache[entry.sourceUrl]) {
-      toolCache[entry.sourceUrl] = {};
-    }
-    toolCache[entry.sourceUrl][entry.name] = toolData;
-    await chrome.storage.local.set({toolCache});
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to fetch tool';
-    fetchErrors.value = {...fetchErrors.value, [compositeId]: message};
-    const next = new Set(fetchingIds.value);
-    next.delete(compositeId);
-    fetchingIds.value = next;
-    return; // Don't enable if failed
-  } finally {
-    const next = new Set(fetchingIds.value);
-    next.delete(compositeId);
-    fetchingIds.value = next;
-  }
-
-  // Store reference in enabledToolGroups and remove from disabledTools
-  const newStoredTool: StoredTool = {
-    name: entry.name,
-    sourceUrl: entry.sourceUrl
-  };
-
-  const updatedEnabled = {
-    ...enabledTools.value,
-    [compositeId]: newStoredTool
-  };
-  const {[compositeId]: ___, ...restDisabled} = disabledTools.value;
-  enabledTools.value = updatedEnabled;
-  disabledTools.value = restDisabled;
-  await chrome.storage.local.set({
-    enabledToolGroups: updatedEnabled,
-    disabledTools: restDisabled
   });
 }
 
-export async function handleGroupToggle(
-  group: ToolGroupResult,
-  sourceUrl: string,
-  baseUrl: string
-): Promise<void> {
-  const currentState = getGroupToggleState(group, sourceUrl);
-  const shouldEnable = currentState !== 'all';
+// Enable all tools in an installed group
+export async function enableGroup(group: InstalledGroup): Promise<void> {
+  const groupId = `${group.sourceUrl}:${group.name}`;
 
-  if (shouldEnable) {
-    // Enable all tools that aren't already enabled
-    const toolsToEnable = group.tools.filter((tool) => {
-      const compositeId = `${sourceUrl}:${tool.name}`;
-      return !enabledTools.value[compositeId];
-    });
+  const toolsToEnable = group.tools.filter((tool) => {
+    const compositeId = `${group.sourceUrl}:${tool.name}`;
+    return !enabledTools.value[compositeId];
+  });
 
-    const ids = toolsToEnable.map((t) => `${sourceUrl}:${t.name}`);
-    const updatedTools = {...enabledTools.value};
-    const newErrors: {[id: string]: string} = {};
+  if (toolsToEnable.length === 0) return;
 
-    const newFetching = new Set(fetchingIds.value);
-    ids.forEach((id) => newFetching.add(id));
-    fetchingIds.value = newFetching;
+  fetchingGroupIds.value = new Set(fetchingGroupIds.value).add(groupId);
 
-    // Get tool data and store in unified toolCache
-    const cacheResult = await chrome.storage.local.get<{
-      toolCache: ToolCache;
-    }>(['toolCache']);
-    const toolCache = cacheResult.toolCache || {};
-    if (!toolCache[sourceUrl]) {
-      toolCache[sourceUrl] = {};
+  const cacheResult = await chrome.storage.local.get<{
+    toolCache: ToolCache;
+  }>(['toolCache']);
+  const toolCache = cacheResult.toolCache || {};
+  if (!toolCache[group.sourceUrl]) {
+    toolCache[group.sourceUrl] = {};
+  }
+
+  const updatedTools = {...enabledTools.value};
+  const errors: string[] = [];
+
+  // Fetch sources in parallel
+  const results = await Promise.allSettled(
+    toolsToEnable.map(async (tool) => {
+      const source = await fetchToolSource(group.baseUrl, tool.name);
+      return {tool, source};
+    })
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const tool = toolsToEnable[i];
+    const compositeId = `${group.sourceUrl}:${tool.name}`;
+
+    if (result.status === 'fulfilled') {
+      toolCache[group.sourceUrl][tool.name] = {
+        source: result.value.source,
+        domains: tool.domains,
+        pathPatterns: tool.pathPatterns,
+        queryParams: tool.queryParams,
+        description: tool.description
+      };
+      updatedTools[compositeId] = {
+        name: tool.name,
+        sourceUrl: group.sourceUrl
+      } satisfies StoredTool;
+    } else {
+      errors.push(result.reason?.message || `Failed to fetch ${tool.name}`);
     }
+  }
 
-    // Fetch sources from server
-    const results = await Promise.allSettled(
-      toolsToEnable.map(async (tool) => {
-        const source = await fetchToolSource(baseUrl, tool.name);
-        return {tool, source};
-      })
-    );
+  await chrome.storage.local.set({toolCache});
 
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      const tool = toolsToEnable[i];
-      const compositeId = `${sourceUrl}:${tool.name}`;
+  const nextFetching = new Set(fetchingGroupIds.value);
+  nextFetching.delete(groupId);
+  fetchingGroupIds.value = nextFetching;
 
-      if (result.status === 'fulfilled') {
-        toolCache[sourceUrl][tool.name] = {
-          source: result.value.source,
-          domains: tool.domains,
-          pathPatterns: tool.pathPatterns,
-          queryParams: tool.queryParams,
-          description: tool.description
-        };
-        updatedTools[compositeId] = {
-          name: tool.name,
-          sourceUrl
-        };
-      } else {
-        newErrors[compositeId] =
-          result.reason?.message || 'Failed to fetch tool';
-      }
-    }
+  enabledTools.value = updatedTools;
+  await chrome.storage.local.set({enabledToolGroups: updatedTools});
 
-    await chrome.storage.local.set({toolCache});
-
-    const nextFetching = new Set(fetchingIds.value);
-    ids.forEach((id) => nextFetching.delete(id));
-    fetchingIds.value = nextFetching;
-
-    // Remove tools from disabledTools and group from disabledGroups
-    const groupId = `${sourceUrl}:${group.name}`;
-    const updatedDisabledTools: DisabledTools = {};
-    const toolsToRemove: string[] = [];
-    for (const tool of group.tools) {
-      const compositeId = `${sourceUrl}:${tool.name}`;
-      toolsToRemove.push(compositeId);
-    }
-    for (const [key, value] of Object.entries(disabledTools.value)) {
-      if (!toolsToRemove.includes(key)) {
-        updatedDisabledTools[key] = value;
-      }
-    }
-    const {[groupId]: _, ...updatedDisabledGroups} = disabledGroups.value;
-
-    enabledTools.value = updatedTools;
-    disabledTools.value = updatedDisabledTools;
-    disabledGroups.value = updatedDisabledGroups;
-    await chrome.storage.local.set({
-      enabledToolGroups: updatedTools,
-      disabledTools: updatedDisabledTools,
-      disabledGroups: updatedDisabledGroups
-    });
-    if (Object.keys(newErrors).length > 0) {
-      fetchErrors.value = {...fetchErrors.value, ...newErrors};
-    }
+  if (errors.length > 0) {
+    fetchErrors.value = {...fetchErrors.value, [groupId]: errors.join(', ')};
   } else {
-    // Disable all tools in group - add to disabledGroups
-    const groupId = `${sourceUrl}:${group.name}`;
-    const updatedEnabledTools: EnabledTools = {};
-    const toolsToRemove: string[] = [];
-    for (const tool of group.tools) {
-      const compositeId = `${sourceUrl}:${tool.name}`;
-      toolsToRemove.push(compositeId);
-    }
-    for (const [key, value] of Object.entries(enabledTools.value)) {
-      if (!toolsToRemove.includes(key)) {
-        updatedEnabledTools[key] = value;
-      }
-    }
-    const updatedDisabledGroups = {
-      ...disabledGroups.value,
-      [groupId]: true as const
-    };
+    const {[groupId]: _, ...restErrors} = fetchErrors.value;
+    fetchErrors.value = restErrors;
+  }
+}
 
-    enabledTools.value = updatedEnabledTools;
-    disabledGroups.value = updatedDisabledGroups;
-    await chrome.storage.local.set({
-      enabledToolGroups: updatedEnabledTools,
-      disabledGroups: updatedDisabledGroups
-    });
+// Disable all tools in an installed group
+export async function disableGroup(group: InstalledGroup): Promise<void> {
+  const toolsToRemove = group.tools.map(
+    (tool) => `${group.sourceUrl}:${tool.name}`
+  );
+
+  const updatedEnabled: EnabledTools = {};
+  for (const [key, value] of Object.entries(enabledTools.value)) {
+    if (!toolsToRemove.includes(key)) {
+      updatedEnabled[key] = value;
+    }
+  }
+
+  enabledTools.value = updatedEnabled;
+  await chrome.storage.local.set({enabledToolGroups: updatedEnabled});
+}
+
+// Toggle group enabled state
+export async function toggleGroup(group: InstalledGroup): Promise<void> {
+  if (isGroupEnabled(group)) {
+    await disableGroup(group);
+  } else {
+    await enableGroup(group);
   }
 }

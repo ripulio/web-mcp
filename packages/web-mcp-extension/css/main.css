@@ -1004,3 +1004,49 @@ body {
   height: 2px;
   background: #2196F3;
 }
+
+/* Install/Uninstall buttons */
+.install-btn {
+  padding: 0.375rem 0.75rem;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.install-btn:hover {
+  background: #1976D2;
+}
+
+.uninstall-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+  line-height: 1;
+}
+
+.uninstall-btn:hover {
+  color: #e53935;
+}
+
+.installed-badge {
+  padding: 0.375rem 0.75rem;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.group-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
