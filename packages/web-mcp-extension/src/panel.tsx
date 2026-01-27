@@ -1,5 +1,5 @@
 import {render} from 'preact';
-import {useEffect} from 'preact/hooks';
+import {useEffect, useState} from 'preact/hooks';
 import {
   settings,
   settingsLoading,
@@ -36,6 +36,8 @@ function Panel() {
     }
   }, [settingsLoading.value, settings.value.customSources]);
 
+  const [activeTab, setActiveTab] = useState<'tools' | 'advanced'>('tools');
+
   // Loading state
   if (settingsLoading.value) {
     return (
@@ -55,10 +57,28 @@ function Panel() {
       <div class="panel-header">
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
+      <div class="panel-tabs">
+        <button
+          class={`tab ${activeTab === 'tools' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tools')}
+        >
+          Tools
+        </button>
+        <button
+          class={`tab ${activeTab === 'advanced' ? 'active' : ''}`}
+          onClick={() => setActiveTab('advanced')}
+        >
+          Advanced
+        </button>
+      </div>
       <div class="panel-content">
-        <BrowserControlSection />
-        <CustomSourcesSection />
-        <ToolsSection />
+        {activeTab === 'tools' && <ToolsSection />}
+        {activeTab === 'advanced' && (
+          <>
+            <BrowserControlSection />
+            <CustomSourcesSection />
+          </>
+        )}
       </div>
     </div>
   );
