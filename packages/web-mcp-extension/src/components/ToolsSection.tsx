@@ -5,8 +5,34 @@ import {
 } from '../stores/enabledToolsStore.js';
 import {expandedGroups} from '../stores/uiStore.js';
 import {ToolGroup} from './ToolGroup.js';
+import type {ToolGroupResult} from '../shared.js';
 
 export function ToolsSection() {
+  const sortedGroups: Array<{
+    group: ToolGroupResult;
+    sourceUrl: string;
+    baseUrl: string;
+    toggleState: ReturnType<typeof getGroupToggleState>;
+  }> = [];
+
+  for (const source of filteredRegistry.value) {
+    for (const group of source.groups) {
+      sortedGroups.push({
+        group,
+        sourceUrl: source.sourceUrl,
+        baseUrl: source.baseUrl,
+        toggleState: getGroupToggleState(group, source.sourceUrl)
+      });
+    }
+  }
+
+  sortedGroups.sort((a, b) => {
+    const aEnabled = a.toggleState !== 'none';
+    const bEnabled = b.toggleState !== 'none';
+    if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
+    return a.group.name.localeCompare(b.group.name);
+  });
+
   return (
     <div class="settings-section">
       <h2 class="section-title">Available Tools</h2>
@@ -24,28 +50,25 @@ export function ToolsSection() {
           <p class="no-tools">No tools available from configured sources.</p>
         )
       ) : (
-        filteredRegistry.value.map((source) =>
-          source.groups.map((group) => {
-            const groupId = `${source.sourceUrl}:${group.name}`;
-            const isExpanded = expandedGroups.value.has(groupId);
-            const toggleState = getGroupToggleState(group, source.sourceUrl);
-            const isGroupFetching = group.tools.some((t) =>
-              fetchingIds.value.has(`${source.sourceUrl}:${t.name}`)
-            );
+        sortedGroups.map(({group, sourceUrl, baseUrl, toggleState}) => {
+          const groupId = `${sourceUrl}:${group.name}`;
+          const isExpanded = expandedGroups.value.has(groupId);
+          const isGroupFetching = group.tools.some((t) =>
+            fetchingIds.value.has(`${sourceUrl}:${t.name}`)
+          );
 
-            return (
-              <ToolGroup
-                key={groupId}
-                group={group}
-                sourceUrl={source.sourceUrl}
-                baseUrl={source.baseUrl}
-                isExpanded={isExpanded}
-                toggleState={toggleState}
-                isGroupFetching={isGroupFetching}
-              />
-            );
-          })
-        )
+          return (
+            <ToolGroup
+              key={groupId}
+              group={group}
+              sourceUrl={sourceUrl}
+              baseUrl={baseUrl}
+              isExpanded={isExpanded}
+              toggleState={toggleState}
+              isGroupFetching={isGroupFetching}
+            />
+          );
+        })
       )}
     </div>
   );
