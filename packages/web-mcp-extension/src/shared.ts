@@ -24,21 +24,35 @@ export interface EnabledTools {
   [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`
 }
 
+// Installed tool metadata (no source code - just for display)
+export interface InstalledTool {
+  name: string;
+  description: string;
+  domains: string[];
+  pathPatterns: string[];
+  queryParams: Record<string, string>;
+}
+
+// Installed group with all its tools
+export interface InstalledGroup {
+  name: string;
+  sourceUrl: string;
+  baseUrl: string;
+  description: string;
+  tools: InstalledTool[];
+}
+
+// All installed groups keyed by groupId (sourceUrl:groupName)
+export interface InstalledGroups {
+  [groupId: string]: InstalledGroup;
+}
+
 export interface PackageSource {
   url: string;
   name?: string;
   type?: 'remote' | 'local';
   enabled?: boolean; // defaults to true
   autoEnable?: boolean; // auto-enable new tools on refresh, defaults to false
-}
-
-// Tools/groups explicitly disabled by user (respected by auto-enable)
-export interface DisabledTools {
-  [compositeId: string]: true; // compositeId = `${sourceUrl}:${toolName}`
-}
-
-export interface DisabledGroups {
-  [groupId: string]: true; // groupId = `${sourceUrl}:${groupName}`
 }
 
 export interface WebMCPSettings {
