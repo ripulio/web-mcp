@@ -2,8 +2,8 @@ import {signal} from '@preact/signals';
 import type {
   InstalledGroups,
   InstalledGroup,
-  InstalledTool,
   ToolGroupResult,
+  ToolRegistryResult,
   ToolCache,
   EnabledTools
 } from '../shared.js';
@@ -27,20 +27,12 @@ export async function installGroup(
 ): Promise<void> {
   const groupId = `${sourceUrl}:${group.name}`;
 
-  const installedTools: InstalledTool[] = group.tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    domains: tool.domains,
-    pathPatterns: tool.pathPatterns,
-    queryParams: tool.queryParams
-  }));
-
   const installedGroup: InstalledGroup = {
     name: group.name,
     sourceUrl,
     baseUrl,
     description: group.description,
-    tools: installedTools
+    tools: group.tools
   };
 
   const updated = {...installedGroups.value, [groupId]: installedGroup};
@@ -108,7 +100,7 @@ export function isGroupInstalled(groupId: string): boolean {
 // Get an installed tool by composite ID
 export function getInstalledTool(
   compositeId: string
-): {group: InstalledGroup; tool: InstalledTool} | null {
+): {group: InstalledGroup; tool: ToolRegistryResult} | null {
   // compositeId format: sourceUrl:toolName
   for (const group of Object.values(installedGroups.value)) {
     for (const tool of group.tools) {
