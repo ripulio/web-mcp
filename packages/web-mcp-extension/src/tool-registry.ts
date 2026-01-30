@@ -1,18 +1,12 @@
 import type {
   PackageSource,
-  RemoteManifest,
-  RemoteTool,
+  ListGroupsResponse,
+  ToolResponse,
   ManifestCache,
   ManifestCacheEntry,
-  ToolRegistryResult,
   ToolCache,
-  GroupedToolRegistryResult,
-  DomainFilter,
-  PathFilter,
-  QueryFilter
+  SourceResult
 } from './shared.js';
-
-export type {ToolRegistryResult, GroupedToolRegistryResult};
 
 // Internal cache mode type (no longer user-configurable)
 type CacheMode = 'none' | 'session';
@@ -26,25 +20,7 @@ interface ToolGroupResponse {
   tools: string[];
 }
 
-// Helper to extract domains, pathPatterns, and queryParams from filters array
-function extractFilters(filters: RemoteTool['filters']): {
-  domains: string[];
-  pathPatterns: string[];
-  queryParams: Record<string, string>;
-} {
-  const domainFilter = filters.find(
-    (f): f is DomainFilter => f.type === 'domain'
-  );
-  const pathFilter = filters.find((f): f is PathFilter => f.type === 'path');
-  const queryFilter = filters.find((f): f is QueryFilter => f.type === 'query');
-  return {
-    domains: domainFilter?.domains || [],
-    pathPatterns: pathFilter?.paths || [],
-    queryParams: queryFilter?.parameters || {}
-  };
-}
-
-async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
+async function fetchManifest(baseUrl: string): Promise<ListGroupsResponse> {
   // Fetch groups from catalog API
   const groupsUrl = `${baseUrl.replace(/\/$/, '')}/groups`;
   const groupsResponse = await fetch(groupsUrl);
@@ -60,7 +36,7 @@ async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
 
   // Build a map of tool name -> RemoteTool for deduplication
   const allToolNames = new Set(groupsData.flatMap((g) => g.tools));
-  const toolMap = new Map<string, RemoteTool>();
+  const toolMap = new Map<string, ToolResponse>();
 
   await Promise.all(
     Array.from(allToolNames).map(async (name) => {
@@ -68,14 +44,14 @@ async function fetchManifest(baseUrl: string): Promise<RemoteManifest> {
       if (!res.ok) {
         throw new Error(`Failed to fetch tool ${name}: ${res.status}`);
       }
-      const tool = (await res.json()) as RemoteTool;
+      const tool = (await res.json()) as ToolResponse;
       toolMap.set(name, tool);
     })
   );
 
   // Build grouped manifest
   return groupsData.map((group) => {
-    const tools: RemoteTool[] = [];
+    const tools: ToolResponse[] = [];
     for (const name of group.tools) {
       const tool = toolMap.get(name);
       if (tool) {
@@ -114,7 +90,7 @@ function setCachedManifest(
 async function getManifestWithCache(
   url: string,
   cacheMode: CacheMode
-): Promise<RemoteManifest> {
+): Promise<ListGroupsResponse> {
   const cached = getCachedManifest(url, cacheMode);
 
   if (cached) {
@@ -135,7 +111,7 @@ async function getManifestWithCache(
 export async function searchToolsGrouped(
   sources: PackageSource[],
   cacheMode: CacheMode
-): Promise<GroupedToolRegistryResult[]> {
+): Promise<SourceResult[]> {
   // Fetch all manifests in parallel
   const manifestPromises = sources.map(async (source) => {
     try {
@@ -144,28 +120,8 @@ export async function searchToolsGrouped(
       return {
         sourceUrl: source.url,
         baseUrl,
-        groups: manifest.map((group) => {
-          return {
-            name: group.name,
-            description: group.description,
-            tools: group.tools.map((tool) => {
-              const {domains, pathPatterns, queryParams} = extractFilters(
-                tool.filters
-              );
-              return {
-                name: tool.id,
-                description: tool.description,
-                domains,
-                pathPatterns,
-                queryParams,
-                sourceUrl: source.url,
-                baseUrl,
-                groupName: group.name
-              };
-            })
-          };
-        })
-      } as GroupedToolRegistryResult;
+        groups: manifest
+      } as SourceResult;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to fetch';
@@ -175,7 +131,7 @@ export async function searchToolsGrouped(
         baseUrl,
         groups: [],
         error: message
-      } as GroupedToolRegistryResult;
+      } as SourceResult;
     }
   });
 
@@ -197,7 +153,7 @@ export async function validateSource(
 export async function searchTools(
   sources: PackageSource[],
   cacheMode: CacheMode
-): Promise<ToolRegistryResult[]> {
+): Promise<ToolResponse[]> {
   const grouped = await searchToolsGrouped(sources, cacheMode);
   return grouped.flatMap((source) =>
     source.groups.flatMap((group) => group.tools)
@@ -228,14 +184,14 @@ export async function fetchToolSource(
 export async function refreshToolCache(
   sourceUrl: string,
   baseUrl: string,
-  toolsToRefresh: ToolRegistryResult[]
+  toolsToRefresh: ToolResponse[]
 ): Promise<void> {
   if (toolsToRefresh.length === 0) return;
 
   // Fetch all sources in parallel
   const results = await Promise.allSettled(
     toolsToRefresh.map(async (tool) => {
-      const source = await fetchToolSource(baseUrl, tool.name);
+      const source = await fetchToolSource(baseUrl, tool.id);
       return {tool, source};
     })
   );
@@ -252,7 +208,7 @@ export async function refreshToolCache(
   for (const result of results) {
     if (result.status === 'fulfilled') {
       const {tool, source} = result.value;
-      toolCache[sourceUrl][tool.name] = {
+      toolCache[sourceUrl][tool.id] = {
         source,
         tool
       };

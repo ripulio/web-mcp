@@ -1,5 +1,5 @@
 import {signal, computed} from '@preact/signals';
-import type {GroupedToolRegistryResult} from '../shared.js';
+import type {SourceResult} from '../shared.js';
 import {filterGroupedRegistry} from '../utils/search.js';
 import {activeRegistry} from './registryStore.js';
 
@@ -7,7 +7,7 @@ import {activeRegistry} from './registryStore.js';
 export const searchQuery = signal('');
 
 // Computed filtered registry
-export const filteredRegistry = computed((): GroupedToolRegistryResult[] =>
+export const filteredRegistry = computed((): SourceResult[] =>
   filterGroupedRegistry(activeRegistry.value, searchQuery.value)
 );
 

@@ -2,8 +2,8 @@ import {signal} from '@preact/signals';
 import type {
   InstalledGroups,
   InstalledGroup,
-  ToolGroupResult,
-  ToolRegistryResult,
+  GroupResponse,
+  ToolResponse,
   ToolCache,
   EnabledTools
 } from '../shared.js';
@@ -21,7 +21,7 @@ export async function loadInstalledGroups(): Promise<void> {
 
 // Install a group (does NOT enable any tools)
 export async function installGroup(
-  group: ToolGroupResult,
+  group: GroupResponse,
   sourceUrl: string,
   baseUrl: string
 ): Promise<void> {
@@ -68,7 +68,7 @@ export async function uninstallGroup(groupId: string): Promise<void> {
   }>(['toolCache']);
   let toolCache = cacheResult.toolCache || {};
   if (toolCache[group.sourceUrl]) {
-    const toolNamesToRemove = new Set(group.tools.map((t) => t.name));
+    const toolNamesToRemove = new Set(group.tools.map((t) => t.id));
     const remainingTools: ToolCache[string] = {};
     for (const [toolName, toolData] of Object.entries(
       toolCache[group.sourceUrl]
@@ -100,11 +100,11 @@ export function isGroupInstalled(groupId: string): boolean {
 // Get an installed tool by composite ID
 export function getInstalledTool(
   compositeId: string
-): {group: InstalledGroup; tool: ToolRegistryResult} | null {
+): {group: InstalledGroup; tool: ToolResponse} | null {
   // compositeId format: sourceUrl:toolName
   for (const group of Object.values(installedGroups.value)) {
     for (const tool of group.tools) {
-      if (`${group.sourceUrl}:${tool.name}` === compositeId) {
+      if (`${group.sourceUrl}:${tool.id}` === compositeId) {
         return {group, tool};
       }
     }

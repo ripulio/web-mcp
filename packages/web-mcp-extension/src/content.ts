@@ -4,14 +4,7 @@ import type {
   WebMCPSettings,
   ToolCache
 } from './shared.js';
-
-// Resolved tool data for injection
-interface ResolvedToolData {
-  source: string;
-  domains: string[];
-  pathPatterns: string[];
-  queryParams: Record<string, string>;
-}
+import {matchesFilter} from './utils/search.js';
 
 export interface ToolToInject {
   toolId: string;
@@ -119,6 +112,7 @@ async function evaluateAndInjectTools() {
 
   const toolsToInject: ToolToInject[] = [];
   const newToolNames = new Set<string>();
+  const currentUrl = new URL(window.location.href);
 
   for (const toolRef of Object.values(enabledTools) as StoredTool[]) {
     // Check if tool's source is enabled
@@ -138,47 +132,9 @@ async function evaluateAndInjectTools() {
       continue;
     }
 
-    const toolData: ResolvedToolData = {
-      source: cached.source,
-      domains: cached.tool.domains,
-      pathPatterns: cached.tool.pathPatterns,
-      queryParams: cached.tool.queryParams || {}
-    };
-
-    const domainMatches =
-      toolData.domains.includes('*') ||
-      toolData.domains.some((domain) => window.location.hostname === domain);
-    if (!domainMatches) {
+    if (!cached.tool.filters.every((f) => matchesFilter(f, currentUrl))) {
       console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: domain mismatch (expected ${toolData.domains.join(', ')}, got ${window.location.hostname})`
-      );
-      continue;
-    }
-
-    // Check if any path pattern matches (empty array means match all paths)
-    const pathMatches =
-      toolData.pathPatterns.length === 0 ||
-      toolData.pathPatterns.some((pattern) =>
-        new RegExp(pattern).test(window.location.pathname)
-      );
-    if (!pathMatches) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: path mismatch (patterns ${toolData.pathPatterns.join(', ')}, got ${window.location.pathname})`
-      );
-      continue;
-    }
-
-    // Check if query parameters match (empty object means match all)
-    const queryParamKeys = Object.keys(toolData.queryParams);
-    const queryMatches =
-      queryParamKeys.length === 0 ||
-      queryParamKeys.every((key) => {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(key) === toolData.queryParams[key];
-      });
-    if (!queryMatches) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: query param mismatch (expected ${JSON.stringify(toolData.queryParams)}, got ${window.location.search})`
+        `[WebMCP] Tool "${toolRef.name}" skipped: filter mismatch for ${window.location.href}`
       );
       continue;
     }
@@ -189,7 +145,7 @@ async function evaluateAndInjectTools() {
       console.log(
         `[WebMCP] Tool "${toolRef.name}" will be injected (domain, path, and query match)`
       );
-      toolsToInject.push({toolId, source: toolData.source});
+      toolsToInject.push({toolId, source: cached.source});
     } else {
       console.log(
         `[WebMCP] Tool "${toolRef.name}" already registered, skipping`
