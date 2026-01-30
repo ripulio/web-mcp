@@ -140,9 +140,9 @@ async function evaluateAndInjectTools() {
 
     const toolData: ResolvedToolData = {
       source: cached.source,
-      domains: cached.domains,
-      pathPatterns: cached.pathPatterns,
-      queryParams: cached.queryParams || {}
+      domains: cached.tool.domains,
+      pathPatterns: cached.tool.pathPatterns,
+      queryParams: cached.tool.queryParams || {}
     };
 
     const domainMatches =

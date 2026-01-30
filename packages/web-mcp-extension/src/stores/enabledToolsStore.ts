@@ -69,10 +69,7 @@ export async function enableGroup(group: InstalledGroup): Promise<void> {
     if (result.status === 'fulfilled') {
       toolCache[group.sourceUrl][tool.name] = {
         source: result.value.source,
-        domains: tool.domains,
-        pathPatterns: tool.pathPatterns,
-        queryParams: tool.queryParams,
-        description: tool.description
+        tool
       };
       updatedTools[compositeId] = {
         name: tool.name,

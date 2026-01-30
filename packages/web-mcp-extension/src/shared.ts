@@ -7,10 +7,7 @@ export interface StoredTool {
 // Full tool data cached for injection (both local and remote tools)
 export interface CachedToolData {
   source: string;
-  domains: string[];
-  pathPatterns: string[];
-  queryParams: Record<string, string>;
-  description: string;
+  tool: ToolRegistryResult;
 }
 
 // Unified cache for ALL enabled tools (local and remote)
@@ -24,22 +21,13 @@ export interface EnabledTools {
   [compositeId: string]: StoredTool; // compositeId = `${sourceUrl}:${toolName}`
 }
 
-// Installed tool metadata (no source code - just for display)
-export interface InstalledTool {
-  name: string;
-  description: string;
-  domains: string[];
-  pathPatterns: string[];
-  queryParams: Record<string, string>;
-}
-
 // Installed group with all its tools
 export interface InstalledGroup {
   name: string;
   sourceUrl: string;
   baseUrl: string;
   description: string;
-  tools: InstalledTool[];
+  tools: ToolRegistryResult[];
 }
 
 // All installed groups keyed by groupId (sourceUrl:groupName)

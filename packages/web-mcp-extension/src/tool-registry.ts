@@ -5,6 +5,7 @@ import type {
   ManifestCache,
   ManifestCacheEntry,
   ToolRegistryResult,
+  ToolCache,
   GroupedToolRegistryResult,
   DomainFilter,
   PathFilter,
@@ -227,13 +228,7 @@ export async function fetchToolSource(
 export async function refreshToolCache(
   sourceUrl: string,
   baseUrl: string,
-  toolsToRefresh: Array<{
-    name: string;
-    domains: string[];
-    pathPatterns: string[];
-    queryParams: Record<string, string>;
-    description: string;
-  }>
+  toolsToRefresh: ToolRegistryResult[]
 ): Promise<void> {
   if (toolsToRefresh.length === 0) return;
 
@@ -247,7 +242,7 @@ export async function refreshToolCache(
 
   // Update toolCache with full tool data
   const cacheResult = await chrome.storage.local.get<{
-    toolCache: import('./shared.js').ToolCache;
+    toolCache: ToolCache;
   }>(['toolCache']);
   const toolCache = cacheResult.toolCache || {};
   if (!toolCache[sourceUrl]) {
@@ -259,10 +254,7 @@ export async function refreshToolCache(
       const {tool, source} = result.value;
       toolCache[sourceUrl][tool.name] = {
         source,
-        domains: tool.domains,
-        pathPatterns: tool.pathPatterns,
-        queryParams: tool.queryParams,
-        description: tool.description
+        tool
       };
     }
     // Silently skip failed fetches - tool will use stale data
