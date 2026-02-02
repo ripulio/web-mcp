@@ -7,7 +7,7 @@ export interface StoredTool {
 // Full tool data cached for injection (both local and remote tools)
 export interface CachedToolData {
   source: string;
-  tool: ToolRegistryResult;
+  tool: ToolResponse;
 }
 
 // Unified cache for ALL enabled tools (local and remote)
@@ -27,7 +27,7 @@ export interface InstalledGroup {
   sourceUrl: string;
   baseUrl: string;
   description: string;
-  tools: ToolRegistryResult[];
+  tools: ToolResponse[];
 }
 
 // All installed groups keyed by groupId (sourceUrl:groupName)
@@ -74,48 +74,31 @@ export interface QueryFilter {
 
 export type ToolFilter = DomainFilter | PathFilter | QueryFilter;
 
-export interface RemoteTool {
+export interface ToolResponse {
   id: string;
   description: string;
   filters: ToolFilter[];
   groupId: string;
 }
 
-export interface RemoteToolGroup {
+export interface GroupResponse {
   name: string;
   description: string;
-  tools: RemoteTool[];
+  tools: ToolResponse[];
 }
 
-export type RemoteManifest = RemoteToolGroup[];
+export type ListGroupsResponse = GroupResponse[];
 
 export interface ManifestCacheEntry {
-  data: RemoteManifest;
+  data: ListGroupsResponse;
   fetchedAt: number;
 }
 
-// Types for grouped tool display in panel
-export interface ToolRegistryResult {
-  name: string;
-  description: string;
-  domains: string[];
-  pathPatterns: string[]; // multiple patterns supported
-  queryParams: Record<string, string>;
+// Grouped registry results from a single source
+export interface SourceResult {
   sourceUrl: string;
   baseUrl: string;
-  groupName: string;
-}
-
-export interface ToolGroupResult {
-  name: string;
-  description: string;
-  tools: ToolRegistryResult[];
-}
-
-export interface GroupedToolRegistryResult {
-  sourceUrl: string;
-  baseUrl: string;
-  groups: ToolGroupResult[];
+  groups: GroupResponse[];
   error?: string; // populated if fetch failed
 }
 

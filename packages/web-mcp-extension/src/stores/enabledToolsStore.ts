@@ -24,7 +24,7 @@ export async function loadEnabledTools(): Promise<void> {
 // Check if a group is enabled (all tools enabled)
 export function isGroupEnabled(group: InstalledGroup): boolean {
   return group.tools.every((tool) => {
-    const compositeId = `${group.sourceUrl}:${tool.name}`;
+    const compositeId = `${group.sourceUrl}:${tool.id}`;
     return !!enabledTools.value[compositeId];
   });
 }
@@ -34,7 +34,7 @@ export async function enableGroup(group: InstalledGroup): Promise<void> {
   const groupId = `${group.sourceUrl}:${group.name}`;
 
   const toolsToEnable = group.tools.filter((tool) => {
-    const compositeId = `${group.sourceUrl}:${tool.name}`;
+    const compositeId = `${group.sourceUrl}:${tool.id}`;
     return !enabledTools.value[compositeId];
   });
 
@@ -56,7 +56,7 @@ export async function enableGroup(group: InstalledGroup): Promise<void> {
   // Fetch sources in parallel
   const results = await Promise.allSettled(
     toolsToEnable.map(async (tool) => {
-      const source = await fetchToolSource(group.baseUrl, tool.name);
+      const source = await fetchToolSource(group.baseUrl, tool.id);
       return {tool, source};
     })
   );
@@ -64,19 +64,19 @@ export async function enableGroup(group: InstalledGroup): Promise<void> {
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const tool = toolsToEnable[i];
-    const compositeId = `${group.sourceUrl}:${tool.name}`;
+    const compositeId = `${group.sourceUrl}:${tool.id}`;
 
     if (result.status === 'fulfilled') {
-      toolCache[group.sourceUrl][tool.name] = {
+      toolCache[group.sourceUrl][tool.id] = {
         source: result.value.source,
         tool
       };
       updatedTools[compositeId] = {
-        name: tool.name,
+        name: tool.id,
         sourceUrl: group.sourceUrl
       } satisfies StoredTool;
     } else {
-      errors.push(result.reason?.message || `Failed to fetch ${tool.name}`);
+      errors.push(result.reason?.message || `Failed to fetch ${tool.id}`);
     }
   }
 
@@ -100,7 +100,7 @@ export async function enableGroup(group: InstalledGroup): Promise<void> {
 // Disable all tools in an installed group
 export async function disableGroup(group: InstalledGroup): Promise<void> {
   const toolsToRemove = group.tools.map(
-    (tool) => `${group.sourceUrl}:${tool.name}`
+    (tool) => `${group.sourceUrl}:${tool.id}`
   );
 
   const updatedEnabled: EnabledTools = {};

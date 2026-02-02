@@ -9,14 +9,15 @@ import {
   installGroup,
   isGroupInstalled
 } from '../stores/installedToolsStore.js';
-import type {ToolGroupResult} from '../shared.js';
+import type {GroupResponse} from '../shared.js';
+import {ToolFilters} from './ToolFilters.js';
 
 function SearchGroupCard({
   group,
   sourceUrl,
   baseUrl
 }: {
-  group: ToolGroupResult;
+  group: GroupResponse;
   sourceUrl: string;
   baseUrl: string;
 }) {
@@ -62,47 +63,11 @@ function SearchGroupCard({
       {expanded && (
         <div class="tools-list">
           {group.tools.map((tool) => (
-            <div key={tool.name} class="registry-entry">
+            <div key={tool.id} class="registry-entry">
               <div class="registry-row">
                 <div class="registry-info">
-                  <span class="registry-name">{tool.name}</span>
-                  <div class="tool-filters">
-                    <div class="filter-row">
-                      <span class="filter-label">Domains</span>
-                      {tool.domains.includes('*') ? (
-                        <span class="filter-pill">All domains</span>
-                      ) : (
-                        tool.domains.map((domain) => (
-                          <span key={domain} class="filter-pill">
-                            {domain}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                    <div class="filter-row">
-                      <span class="filter-label">Paths</span>
-                      {tool.pathPatterns.length === 0 ||
-                      tool.pathPatterns.includes('.*') ? (
-                        <span class="filter-pill">All paths</span>
-                      ) : (
-                        tool.pathPatterns.map((pattern) => (
-                          <span key={pattern} class="filter-pill">
-                            {pattern}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                    {Object.keys(tool.queryParams).length > 0 && (
-                      <div class="filter-row">
-                        <span class="filter-label">Query</span>
-                        {Object.entries(tool.queryParams).map(([key, value]) => (
-                          <span key={key} class="filter-pill">
-                            {key}={value}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <span class="registry-name">{tool.id}</span>
+                  <ToolFilters filters={tool.filters} />
                   {tool.description && (
                     <span class="tool-description">{tool.description}</span>
                   )}

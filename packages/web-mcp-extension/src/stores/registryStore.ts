@@ -1,9 +1,9 @@
 import {signal} from '@preact/signals';
-import type {PackageSource, GroupedToolRegistryResult} from '../shared.js';
+import type {PackageSource, SourceResult} from '../shared.js';
 import {searchToolsGrouped} from '../tool-registry.js';
 
 // Core signals
-export const activeRegistry = signal<GroupedToolRegistryResult[]>([]);
+export const activeRegistry = signal<SourceResult[]>([]);
 export const sourceErrors = signal<{[url: string]: string}>({});
 export const registryLoading = signal(true);
 
