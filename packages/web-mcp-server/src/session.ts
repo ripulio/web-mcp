@@ -32,7 +32,7 @@ export interface Session {
   readonly pendingCalls: Map<string, PendingCall>;
   readonly pendingOpenTabs: Map<string, PendingOpenTabOperation>;
   readonly pendingCloseTabs: Map<number, PendingCloseTabOperation>;
-  readonly pendingConnect: PendingConnect | null;
+  pendingConnect: PendingConnect | null;
   connectInProgress: boolean;
 }
 
