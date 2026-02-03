@@ -25,15 +25,15 @@ export interface PendingConnect {
 }
 
 export interface Session {
-  readonly id: string;
-  readonly createdAt: number;
-  readonly lastActivityAt: number;
-  readonly callIdCounter: number;
+  id: string;
+  createdAt: number;
+  lastActivityAt: number;
+  callIdCounter: number;
   readonly pendingCalls: Map<string, PendingCall>;
   readonly pendingOpenTabs: Map<string, PendingOpenTabOperation>;
   readonly pendingCloseTabs: Map<number, PendingCloseTabOperation>;
   readonly pendingConnect: PendingConnect | null;
-  readonly connectInProgress: boolean;
+  connectInProgress: boolean;
 }
 
 const sessions = new Map<string, Session>();
