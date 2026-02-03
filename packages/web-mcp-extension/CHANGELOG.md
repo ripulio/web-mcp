@@ -1,5 +1,11 @@
 # @ripulio/web-mcp-extension
 
+## 0.2.2
+
+### Patch Changes
+
+- a04a93d: Add install capability to tools.
+
 ## 0.2.1
 
 ### Patch Changes
