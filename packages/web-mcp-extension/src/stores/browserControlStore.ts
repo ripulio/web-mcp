@@ -1,11 +1,14 @@
 import {signal} from '@preact/signals';
 import type {BrowserControlStatus} from '../shared.js';
 
-// Core signal
+// Core signals
 export const browserControlStatus = signal<BrowserControlStatus>({
   enabled: false,
-  connectedPorts: []
+  connectedPorts: [],
+  detectedPorts: []
 });
+
+export const detectedServerPorts = signal<number[]>([]);
 
 // Actions
 export function refreshStatus(): void {
@@ -19,6 +22,17 @@ export function refreshStatus(): void {
   );
 }
 
+function detectServers(): void {
+  chrome.runtime.sendMessage(
+    {type: 'BROWSER_CONTROL_DETECT_SERVERS'},
+    (response: {detectedPorts: number[]}) => {
+      if (response?.detectedPorts) {
+        detectedServerPorts.value = response.detectedPorts;
+      }
+    }
+  );
+}
+
 // Initialize polling and listeners (call from panel.tsx once)
 let initialized = false;
 export function initBrowserControlPolling(): () => void {
@@ -26,6 +40,7 @@ export function initBrowserControlPolling(): () => void {
   initialized = true;
 
   refreshStatus();
+  detectServers();
 
   const listener = (message: {type: string; status?: BrowserControlStatus}) => {
     if (message.type === 'BROWSER_CONTROL_STATUS_UPDATE' && message.status) {
@@ -34,11 +49,13 @@ export function initBrowserControlPolling(): () => void {
   };
   chrome.runtime.onMessage.addListener(listener);
 
-  const interval = setInterval(refreshStatus, 2000);
+  const statusInterval = setInterval(refreshStatus, 2000);
+  const detectInterval = setInterval(detectServers, 5000);
 
   return () => {
     chrome.runtime.onMessage.removeListener(listener);
-    clearInterval(interval);
+    clearInterval(statusInterval);
+    clearInterval(detectInterval);
     initialized = false;
   };
 }

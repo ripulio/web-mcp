@@ -267,4 +267,5 @@ export type ServerMessage =
 export interface BrowserControlStatus {
   enabled: boolean;
   connectedPorts: number[];
+  detectedPorts: number[];
 }
