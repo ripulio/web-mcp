@@ -52,11 +52,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle browser control messages from panel
   if (message.type === 'BROWSER_CONTROL_TOGGLE') {
-    if (message.enabled) {
-      startBrowserControl();
-    } else {
-      stopBrowserControl();
-    }
+    (async () => {
+      if (message.enabled) {
+        await startBrowserControl();
+      } else {
+        await stopBrowserControl();
+      }
+    })().catch((err) =>
+      console.error(`${BC_LOG_PREFIX} Toggle failed:`, err)
+    );
     sendResponse({success: true});
     return true;
   }
@@ -229,13 +233,13 @@ async function injectTools(tabId: number, tools: ToolToInject[]) {
 const BC_LOG_PREFIX = '[WebMCP Browser Control]';
 const WS_PORT_START = 8765;
 const WS_PORT_END = 8785;
-const KEEPALIVE_INTERVAL = 20 * 1000; // 20 seconds
-const DISCOVERY_INTERVAL = 5 * 1000; // 5 seconds
+
+// Alarm names for chrome.alarms API (survives service worker suspension)
+const DISCOVERY_ALARM_NAME = 'browserControlDiscovery';
+const KEEPALIVE_ALARM_NAME = 'browserControlKeepalive';
 
 // WebSocket connection state
 const wsConnections = new Map<number, WebSocket>();
-let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
-let discoveryInterval: ReturnType<typeof setInterval> | null = null;
 let browserControlEnabled = false;
 
 // Initialize browser control based on stored settings
@@ -246,28 +250,40 @@ async function initBrowserControl(): Promise<void> {
   const settings = result.webmcpSettings || DEFAULT_SETTINGS;
 
   if (settings.browserControlEnabled) {
-    startBrowserControl();
+    // Check if alarms exist (may have been lost on SW restart)
+    const alarms = await chrome.alarms.getAll();
+    const hasDiscovery = alarms.some((a) => a.name === DISCOVERY_ALARM_NAME);
+    const hasKeepalive = alarms.some((a) => a.name === KEEPALIVE_ALARM_NAME);
+
+    if (!hasDiscovery || !hasKeepalive) {
+      // Alarms missing, do full start
+      await startBrowserControl();
+    } else {
+      // Alarms exist, just mark as enabled and reconnect
+      browserControlEnabled = true;
+      await discoverServers();
+    }
   }
 }
 
-function startBrowserControl(): void {
+async function startBrowserControl(): Promise<void> {
   if (browserControlEnabled) return;
   browserControlEnabled = true;
 
   console.log(
     `${BC_LOG_PREFIX} Starting - scanning ports ${WS_PORT_START}-${WS_PORT_END}`
   );
-  startDiscovery();
-  startKeepalive();
+  await startDiscovery();
+  await startKeepalive();
 }
 
-function stopBrowserControl(): void {
+async function stopBrowserControl(): Promise<void> {
   if (!browserControlEnabled) return;
   browserControlEnabled = false;
 
   console.log(`${BC_LOG_PREFIX} Stopping`);
-  stopDiscovery();
-  stopKeepalive();
+  await stopDiscovery();
+  await stopKeepalive();
 
   // Close all connections
   for (const [, ws] of wsConnections) {
@@ -335,30 +351,27 @@ async function discoverServers(): Promise<void> {
   await Promise.all(promises);
 }
 
-function startDiscovery(): void {
-  discoverServers();
-  discoveryInterval = setInterval(discoverServers, DISCOVERY_INTERVAL);
+async function startDiscovery(): Promise<void> {
+  await stopDiscovery();
+  discoverServers(); // Run immediately
+  await chrome.alarms.create(DISCOVERY_ALARM_NAME, {
+    periodInMinutes: 0.5 // 30 seconds (Chrome minimum)
+  });
 }
 
-function stopDiscovery(): void {
-  if (discoveryInterval) {
-    clearInterval(discoveryInterval);
-    discoveryInterval = null;
-  }
+async function stopDiscovery(): Promise<void> {
+  await chrome.alarms.clear(DISCOVERY_ALARM_NAME);
 }
 
-function startKeepalive(): void {
-  stopKeepalive();
-  keepaliveInterval = setInterval(() => {
-    wsBroadcast({type: ExtensionMessageType.PING});
-  }, KEEPALIVE_INTERVAL);
+async function startKeepalive(): Promise<void> {
+  await stopKeepalive();
+  await chrome.alarms.create(KEEPALIVE_ALARM_NAME, {
+    periodInMinutes: 0.5 // 30 seconds
+  });
 }
 
-function stopKeepalive(): void {
-  if (keepaliveInterval) {
-    clearInterval(keepaliveInterval);
-    keepaliveInterval = null;
-  }
+async function stopKeepalive(): Promise<void> {
+  await chrome.alarms.clear(KEEPALIVE_ALARM_NAME);
 }
 
 function sendToPort(port: number, message: ExtensionMessage): void {
@@ -742,6 +755,49 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       }
     });
   }
+});
+
+// Handle alarms for browser control
+// NOTE: This listener MUST be registered at top level (not conditionally)
+// NOTE: We check storage instead of browserControlEnabled because in-memory
+//       state is lost when SW suspends and restarts
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (
+    alarm.name !== DISCOVERY_ALARM_NAME &&
+    alarm.name !== KEEPALIVE_ALARM_NAME
+  ) {
+    return;
+  }
+
+  // Alarms only exist when browser control is enabled, so if we're here
+  // and the alarm is ours, we should reconnect. The wsConnections Map
+  // will be empty after SW restart (JS heap destroyed), so always discover.
+  (async () => {
+    // Double-check storage in case user disabled while SW was suspended
+    const result = await chrome.storage.local.get<{
+      webmcpSettings: WebMCPSettings;
+    }>(['webmcpSettings']);
+    const settings = result.webmcpSettings || DEFAULT_SETTINGS;
+    if (!settings.browserControlEnabled) {
+      // User disabled - clear alarms
+      await chrome.alarms.clear(DISCOVERY_ALARM_NAME);
+      await chrome.alarms.clear(KEEPALIVE_ALARM_NAME);
+      return;
+    }
+
+    // Ensure in-memory state is set (may have been lost during suspension)
+    browserControlEnabled = true;
+
+    // Always try to reconnect - wsConnections is empty after SW restart
+    await discoverServers();
+
+    // Send keepalive to any connected servers
+    if (alarm.name === KEEPALIVE_ALARM_NAME) {
+      wsBroadcast({type: ExtensionMessageType.PING});
+    }
+  })().catch((err) =>
+    console.error(`${BC_LOG_PREFIX} Alarm handler error:`, err)
+  );
 });
 
 // Initialize browser control on service worker start

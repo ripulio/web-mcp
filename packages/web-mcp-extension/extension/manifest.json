@@ -3,7 +3,7 @@
   "name": "WebMCP",
   "version": "1.0.0",
   "description": "Loads WebMCP functions and injects into web pages.",
-  "permissions": ["activeTab", "scripting", "storage", "userScripts"],
+  "permissions": ["activeTab", "scripting", "storage", "userScripts", "alarms"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "WebMCP",

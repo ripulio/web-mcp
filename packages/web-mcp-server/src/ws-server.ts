@@ -141,6 +141,58 @@ export function isSocketConnected(): boolean {
   );
 }
 
+const CONNECTION_WAIT_TIMEOUT = 35000; // 35 seconds (covers 30s alarm interval)
+const CONNECTION_POLL_INTERVAL = 500; // Check every 500ms
+const CONNECTION_LOG_INTERVAL = 5000; // Log progress every 5s
+
+export function waitForConnection(
+  timeoutMs = CONNECTION_WAIT_TIMEOUT
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Already connected
+    if (isSocketConnected()) {
+      resolve();
+      return;
+    }
+
+    console.error('Waiting for browser extension to connect...');
+    const startTime = Date.now();
+    let lastLogTime = startTime;
+
+    const checkConnection = () => {
+      if (isSocketConnected()) {
+        console.error('Browser extension connected');
+        resolve();
+        return;
+      }
+
+      const elapsed = Date.now() - startTime;
+
+      if (elapsed >= timeoutMs) {
+        reject(
+          new Error(
+            `Extension not connected after ${timeoutMs / 1000}s. ` +
+              'Ensure the browser extension is installed and browser control is enabled.'
+          )
+        );
+        return;
+      }
+
+      // Log progress every 5 seconds so user knows we're waiting
+      if (Date.now() - lastLogTime >= CONNECTION_LOG_INTERVAL) {
+        console.error(
+          `Still waiting for extension... (${Math.round(elapsed / 1000)}s)`
+        );
+        lastLogTime = Date.now();
+      }
+
+      setTimeout(checkConnection, CONNECTION_POLL_INTERVAL);
+    };
+
+    checkConnection();
+  });
+}
+
 export function getActivePort(): number | null {
   return activePort;
 }
