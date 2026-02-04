@@ -9,7 +9,14 @@ import {
 import {loadRegistry} from './stores/registryStore.js';
 import {loadEnabledTools} from './stores/enabledToolsStore.js';
 import {loadInstalledGroups} from './stores/installedToolsStore.js';
-import {initBrowserControlPolling} from './stores/browserControlStore.js';
+import {
+  initBrowserControlPolling,
+  detectedServerPorts
+} from './stores/browserControlStore.js';
+import {
+  browserControlEnabled,
+  handleBrowserControlToggle
+} from './stores/settingsStore.js';
 import {InstalledSection} from './components/InstalledSection.js';
 import {SearchSection} from './components/SearchSection.js';
 import {BrowserControlSection} from './components/BrowserControlSection.js';
@@ -57,6 +64,20 @@ function Panel() {
       <div class="panel-header">
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
+      {!browserControlEnabled.value &&
+        detectedServerPorts.value.length > 0 && (
+          <div class="server-detected-banner">
+            <span>MCP server detected. Enable browser control to connect?</span>
+            <button
+              onClick={() => {
+                handleBrowserControlToggle(true);
+                setActiveTab('advanced');
+              }}
+            >
+              Enable Browser Control
+            </button>
+          </div>
+        )}
       <div class="panel-tabs">
         <button
           class={`tab ${activeTab === 'installed' ? 'active' : ''}`}

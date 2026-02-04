@@ -1005,6 +1005,37 @@ body {
   background: #2196F3;
 }
 
+/* Server detected banner */
+.server-detected-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem 0;
+  padding: 0.625rem 1rem;
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: #1565c0;
+}
+
+.server-detected-banner button {
+  padding: 0.375rem 0.75rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.server-detected-banner button:hover {
+  background: #1565c0;
+}
+
 /* Install/Uninstall buttons */
 .install-btn {
   padding: 0.375rem 0.75rem;

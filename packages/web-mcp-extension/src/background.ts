@@ -66,6 +66,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'BROWSER_CONTROL_DETECT_SERVERS') {
+    detectServers().then((ports) => {
+      sendResponse({detectedPorts: ports});
+    });
+    return true;
+  }
+
   // Handle popup requests (no sender.tab)
   if (message.type === 'WEBMCP_GET_TAB_STATE') {
     getTabState(message.tabId).then((state) => {
@@ -380,10 +387,25 @@ function wsBroadcast(message: ExtensionMessage): void {
   }
 }
 
+async function detectServers(): Promise<number[]> {
+  const ports: number[] = [];
+  const promises: Promise<void>[] = [];
+  for (let port = WS_PORT_START; port <= WS_PORT_END; port++) {
+    promises.push(
+      isPortResponding(port).then((responding) => {
+        if (responding) ports.push(port);
+      })
+    );
+  }
+  await Promise.all(promises);
+  return ports.sort((a, b) => a - b);
+}
+
 function getBrowserControlStatus(): BrowserControlStatus {
   return {
     enabled: browserControlEnabled,
-    connectedPorts: Array.from(wsConnections.keys())
+    connectedPorts: Array.from(wsConnections.keys()),
+    detectedPorts: []
   };
 }
 
