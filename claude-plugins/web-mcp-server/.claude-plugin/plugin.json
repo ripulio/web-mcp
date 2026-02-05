@@ -13,7 +13,7 @@
   "mcpServers": {
     "web-mcp-server": {
       "command": "npx",
-      "args": ["-y", "@ripulio/web-mcp-server@0.0.3", "--stdio"]
+      "args": ["-y", "@ripulio/web-mcp-server@0.1.0", "--stdio"]
     }
   }
 }
