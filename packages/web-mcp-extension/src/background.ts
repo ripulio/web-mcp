@@ -48,7 +48,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   deleteTabState(tabId);
 });
 
-// Handle messages from content script and popup
+// Open settings page when extension icon is clicked
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({url: chrome.runtime.getURL('panel.html')});
+});
+
+// Handle messages from content script and panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle browser control messages from panel
   if (message.type === 'BROWSER_CONTROL_TOGGLE') {
@@ -69,14 +74,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'BROWSER_CONTROL_DETECT_SERVERS') {
     detectServers().then((ports) => {
       sendResponse({detectedPorts: ports});
-    });
-    return true;
-  }
-
-  // Handle popup requests (no sender.tab)
-  if (message.type === 'WEBMCP_GET_TAB_STATE') {
-    getTabState(message.tabId).then((state) => {
-      sendResponse({state});
     });
     return true;
   }
