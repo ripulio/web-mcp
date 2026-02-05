@@ -51,7 +51,8 @@ async function handleBrowserAction(
       if (tabId === undefined) {
         throw new Error('tabId parameter is required for get_tab');
       }
-      if (!state.tabs.has(tabId)) {
+      const tab = state.tabs.get(tabId);
+      if (!tab) {
         throw new Error(`Tab ${tabId} not found`);
       }
 
@@ -62,8 +63,6 @@ async function handleBrowserAction(
           err.message
         );
       });
-
-      const tab = state.tabs.get(tabId)!;
       return {
         tab: {
           id: tab.id,
