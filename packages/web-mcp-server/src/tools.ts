@@ -18,7 +18,8 @@ export const browserTool: Tool = {
       },
       tabId: {
         type: 'number',
-        description: 'Tab ID (required for get_tab, close_tab, and page-specific tools)'
+        description:
+          'Tab ID (required for get_tab, close_tab, and page-specific tools)'
       },
       url: {
         type: 'string',

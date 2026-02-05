@@ -57,7 +57,10 @@ async function handleBrowserAction(
 
       // Discover tools for this tab
       await discoverToolsForTab(tabId, DEFAULT_SESSION_ID).catch((err) => {
-        console.error(`Failed to discover tools for tab ${tabId}:`, err.message);
+        console.error(
+          `Failed to discover tools for tab ${tabId}:`,
+          err.message
+        );
       });
 
       const tab = state.tabs.get(tabId)!;
