@@ -47,7 +47,7 @@ export function matchesTool(
   if (URL.canParse(q)) {
     try {
       const url = new URL(q.startsWith('www.') ? `https://${q}` : q);
-      return tool.filters.some(
+      return (tool.filters ?? []).some(
         (f) => f.type === 'domain' && matchesFilter(f, url)
       );
     } catch {
@@ -55,7 +55,7 @@ export function matchesTool(
     }
   }
 
-  const domains = tool.filters
+  const domains = (tool.filters ?? [])
     .filter((f): f is DomainFilter => f.type === 'domain')
     .flatMap((f) => f.domains);
 
