@@ -77,7 +77,7 @@ export type ToolFilter = DomainFilter | PathFilter | QueryFilter;
 export interface ToolResponse {
   id: string;
   description: string;
-  filters: ToolFilter[];
+  filters?: ToolFilter[];
   groupId: string;
 }
 
