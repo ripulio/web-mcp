@@ -1,9 +1,9 @@
 import type {ToolFilter} from '../shared.js';
 
-export function ToolFilters({filters}: {filters: ToolFilter[]}) {
+export function ToolFilters({filters}: {filters?: ToolFilter[]}) {
   return (
     <div class="tool-filters">
-      {filters.map((filter) => {
+      {(filters ?? []).map((filter) => {
         if (filter.type === 'domain') {
           return (
             <div class="filter-row">

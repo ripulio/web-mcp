@@ -132,7 +132,9 @@ async function evaluateAndInjectTools() {
       continue;
     }
 
-    if (!cached.tool.filters.every((f) => matchesFilter(f, currentUrl))) {
+    if (
+      !(cached.tool.filters ?? []).every((f) => matchesFilter(f, currentUrl))
+    ) {
       console.log(
         `[WebMCP] Tool "${toolRef.name}" skipped: filter mismatch for ${window.location.href}`
       );
