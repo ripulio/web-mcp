@@ -1,5 +1,12 @@
 # @ripulio/web-mcp-extension
 
+## 0.2.3
+
+### Patch Changes
+
+- 0dde0ad: Update plugin to use web-mcp-server@0.1.0
+- 484ae31: Handle undefined tool filters safely in ToolResponse processing.
+
 ## 0.2.2
 
 ### Patch Changes
