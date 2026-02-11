@@ -1,5 +1,5 @@
 {
-  "name": "web-mcp",
+  "name": "ripul-plugins",
   "owner": {
     "name": "ripulio",
     "url": "https://github.com/ripulio"
@@ -11,7 +11,7 @@
   },
   "plugins": [
     {
-      "name": "web-mcp-server",
+      "name": "ripul-webmcp",
       "source": "./claude-plugins/web-mcp-server",
       "description": "An MCP server that lets Claude Code control Chrome browsers. Open tabs, interact with pages, and use page-specific tools exposed via navigator.modelContext.",
       "version": "0.0.3",
