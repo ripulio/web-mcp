@@ -6,9 +6,7 @@ import type {
   ServerMessage,
   BrowserControlTabInfo,
   BrowserControlTool,
-  BrowserControlStatus,
-  InstalledGroups,
-  ToolCache
+  BrowserControlStatus
 } from './shared.js';
 import {
   DEFAULT_SETTINGS,
@@ -763,63 +761,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       }
     });
   }
-});
-
-// Storage migrations
-// Normalizes stored tool data to ensure `filters` is always present.
-// Prevents runtime crashes when tools fetched from older API responses
-// omit the `filters` field.
-async function migrateStorageV1(): Promise<void> {
-  const result = await chrome.storage.local.get<{
-    installedGroups: InstalledGroups;
-    toolCache: ToolCache;
-    storageVersion: number;
-  }>(['installedGroups', 'toolCache', 'storageVersion']);
-
-  if (result.storageVersion && result.storageVersion >= 1) return;
-
-  const updates: Record<string, unknown> = {storageVersion: 1};
-
-  // Normalize installedGroups: ensure every tool has filters
-  if (result.installedGroups) {
-    const groups = result.installedGroups;
-    let changed = false;
-    for (const group of Object.values(groups)) {
-      for (const tool of group.tools) {
-        if (!tool.filters) {
-          tool.filters = [];
-          changed = true;
-        }
-      }
-    }
-    if (changed) {
-      updates.installedGroups = groups;
-    }
-  }
-
-  // Normalize toolCache: ensure every cached tool has filters
-  if (result.toolCache) {
-    const cache = result.toolCache;
-    let changed = false;
-    for (const sourceTools of Object.values(cache)) {
-      for (const entry of Object.values(sourceTools)) {
-        if (!entry.tool.filters) {
-          entry.tool.filters = [];
-          changed = true;
-        }
-      }
-    }
-    if (changed) {
-      updates.toolCache = cache;
-    }
-  }
-
-  await chrome.storage.local.set(updates);
-  console.log('[WebMCP] Storage migration v1 complete');
-}
-
-chrome.runtime.onInstalled.addListener(() => {
-  migrateStorageV1();
 });
 
 // Initialize browser control on service worker start
