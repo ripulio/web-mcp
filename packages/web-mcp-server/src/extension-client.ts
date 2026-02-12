@@ -5,7 +5,8 @@ import {
   startServer,
   send,
   isSocketConnected,
-  getActivePort
+  getActivePort,
+  waitForConnection
 } from './ws-server.js';
 
 // Timeout values in milliseconds
@@ -27,22 +28,22 @@ interface PendingOperation<T> {
   timeout: ReturnType<typeof setTimeout>;
 }
 
-// Helper to check connection and throw if not connected
-function requireConnection(): void {
+// Helper to wait for connection before operations
+async function requireConnection(): Promise<void> {
   if (!isSocketConnected()) {
-    throw new Error('Not connected to browser');
+    await waitForConnection();
   }
 }
 
 // Low-level helper to create pending operations with timeout handling
-function createPendingOperation<T, K extends string | number>(
+async function createPendingOperation<T, K extends string | number>(
   pendingMap: Map<K, PendingOperation<T>>,
   key: K,
   timeoutMs: number,
   timeoutMessage: string,
   sendMessage: () => void
 ): Promise<T> {
-  requireConnection();
+  await requireConnection();
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       pendingMap.delete(key);
@@ -81,28 +82,21 @@ export function isConnected(): boolean {
   return isSocketConnected();
 }
 
-export function connectToExtension(
+export async function connectToExtension(
   sessionId: string = DEFAULT_SESSION_ID
 ): Promise<{name: string; version: string; tabCount: number}> {
+  const session = getOrCreateSession(sessionId);
+
+  if (session.connectInProgress) {
+    throw new Error('Connection already in progress');
+  }
+
+  // Wait for extension to connect (handles SW wake-up delay)
+  await waitForConnection();
+
+  session.connectInProgress = true;
+
   return new Promise((resolve, reject) => {
-    const session = getOrCreateSession(sessionId);
-
-    if (session.connectInProgress) {
-      reject(new Error('Connection already in progress'));
-      return;
-    }
-
-    if (!isSocketConnected()) {
-      reject(
-        new Error(
-          'Extension not connected. Please ensure the browser extension is installed and enabled.'
-        )
-      );
-      return;
-    }
-
-    session.connectInProgress = true;
-
     const timeout = setTimeout(() => {
       session.connectInProgress = false;
       session.pendingConnect = null;
