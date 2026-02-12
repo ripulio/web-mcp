@@ -31,7 +31,7 @@ export function isGroupEnabled(group: InstalledGroup): boolean {
 
 // Enable all tools in an installed group
 export async function enableGroup(group: InstalledGroup): Promise<void> {
-  const groupId = `${group.sourceUrl}:${group.name}`;
+  const groupId = `${group.sourceUrl}:${group.id}`;
 
   const toolsToEnable = group.tools.filter((tool) => {
     const compositeId = `${group.sourceUrl}:${tool.id}`;

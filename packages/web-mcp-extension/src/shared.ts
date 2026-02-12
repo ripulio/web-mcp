@@ -23,14 +23,16 @@ export interface EnabledTools {
 
 // Installed group with all its tools
 export interface InstalledGroup {
+  id: string;
   name: string;
   sourceUrl: string;
   baseUrl: string;
   description: string;
+  revision?: number;
   tools: ToolResponse[];
 }
 
-// All installed groups keyed by groupId (sourceUrl:groupName)
+// All installed groups keyed by groupId (sourceUrl:groupId)
 export interface InstalledGroups {
   [groupId: string]: InstalledGroup;
 }
@@ -82,8 +84,10 @@ export interface ToolResponse {
 }
 
 export interface GroupResponse {
+  id: string;
   name: string;
   description: string;
+  revision?: number;
   tools: ToolResponse[];
 }
 

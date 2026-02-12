@@ -15,8 +15,10 @@ type CacheMode = 'none' | 'session';
 const sessionCache: ManifestCache = {};
 
 interface ToolGroupResponse {
+  id: string;
   name: string;
   description: string;
+  revision?: number;
   tools: string[];
 }
 
@@ -59,8 +61,10 @@ async function fetchManifest(baseUrl: string): Promise<ListGroupsResponse> {
       }
     }
     return {
+      id: group.id,
       name: group.name,
       description: group.description,
+      revision: group.revision,
       tools
     };
   });
@@ -158,6 +162,48 @@ export async function searchTools(
   return grouped.flatMap((source) =>
     source.groups.flatMap((group) => group.tools)
   );
+}
+
+export async function fetchGroup(
+  baseUrl: string,
+  groupId: string
+): Promise<import('./shared.js').GroupResponse> {
+  const apiBaseUrl = baseUrl.replace(/\/$/, '');
+  const url = `${apiBaseUrl}/groups/${encodeURIComponent(groupId)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch group from ${url}: ${response.status}`);
+  }
+  const group = (await response.json()) as ToolGroupResponse;
+
+  // Fetch all tool metadata in parallel
+  const toolMap = new Map<string, ToolResponse>();
+  await Promise.all(
+    group.tools.map(async (name) => {
+      const res = await fetch(`${apiBaseUrl}/tools/${name}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch tool ${name}: ${res.status}`);
+      }
+      const tool = (await res.json()) as ToolResponse;
+      toolMap.set(name, tool);
+    })
+  );
+
+  const tools: ToolResponse[] = [];
+  for (const name of group.tools) {
+    const tool = toolMap.get(name);
+    if (tool) {
+      tools.push(tool);
+    }
+  }
+
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    revision: group.revision,
+    tools
+  };
 }
 
 export async function fetchToolSource(

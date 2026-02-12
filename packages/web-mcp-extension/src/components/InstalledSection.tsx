@@ -1,5 +1,11 @@
-import {useState} from 'preact/hooks';
-import {installedGroups, uninstallGroup} from '../stores/installedToolsStore.js';
+import {useState, useEffect} from 'preact/hooks';
+import {
+  installedGroups,
+  uninstallGroup,
+  groupUpdates,
+  checkForUpdates,
+  updateGroup
+} from '../stores/installedToolsStore.js';
 import {
   enabledTools,
   fetchingGroupIds,
@@ -11,17 +17,28 @@ import type {InstalledGroup} from '../shared.js';
 import {ToolFilters} from './ToolFilters.js';
 
 function InstalledGroupCard({group}: {group: InstalledGroup}) {
-  const groupId = `${group.sourceUrl}:${group.name}`;
+  const groupId = `${group.sourceUrl}:${group.id}`;
   const enabled = isGroupEnabled(group);
   const isFetching = fetchingGroupIds.value.has(groupId);
   const error = fetchErrors.value[groupId];
+  const hasUpdate = groupUpdates.value[groupId] !== undefined;
   const [expanded, setExpanded] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // Count enabled tools
   const enabledCount = group.tools.filter((tool) => {
     const compositeId = `${group.sourceUrl}:${tool.id}`;
-    return !!enabledTools.value[compositeId];
+    return enabledTools.value[compositeId] !== undefined;
   }).length;
+
+  const handleUpdate = async () => {
+    setUpdating(true);
+    try {
+      await updateGroup(groupId);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div class="tool-group">
@@ -43,6 +60,15 @@ function InstalledGroupCard({group}: {group: InstalledGroup}) {
             <span class="fetching">Loading...</span>
           ) : (
             <>
+              {hasUpdate && (
+                <button
+                  class="update-badge"
+                  onClick={handleUpdate}
+                  disabled={updating}
+                >
+                  {updating ? 'Updating...' : 'Update available'}
+                </button>
+              )}
               <label class="toggle-switch">
                 <input
                   type="checkbox"
@@ -88,6 +114,10 @@ export function InstalledSection() {
   const [filter, setFilter] = useState('');
   const groups = Object.values(installedGroups.value);
 
+  useEffect(() => {
+    checkForUpdates();
+  }, []);
+
   // Filter groups by name
   const filteredGroups = filter
     ? groups.filter((g) =>
@@ -123,7 +153,7 @@ export function InstalledSection() {
       ) : (
         sortedGroups.map((group) => (
           <InstalledGroupCard
-            key={`${group.sourceUrl}:${group.name}`}
+            key={`${group.sourceUrl}:${group.id}`}
             group={group}
           />
         ))
