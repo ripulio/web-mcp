@@ -11,7 +11,7 @@ import {loadEnabledTools} from './stores/enabledToolsStore.js';
 import {loadInstalledGroups} from './stores/installedToolsStore.js';
 import {
   initBrowserControlPolling,
-  detectedServerPorts
+  browserControlStatus
 } from './stores/browserControlStore.js';
 import {
   browserControlEnabled,
@@ -65,7 +65,7 @@ function Panel() {
         <h1 class="panel-title">WebMCP Settings</h1>
       </div>
       {!browserControlEnabled.value &&
-        detectedServerPorts.value.length > 0 && (
+        browserControlStatus.value.detectedPorts.length > 0 && (
           <div class="server-detected-banner">
             <span>MCP server detected. Enable browser control to connect?</span>
             <button
