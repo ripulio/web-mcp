@@ -106,10 +106,6 @@ async function evaluateAndInjectTools() {
     }
   }
 
-  console.log(
-    `[WebMCP] Evaluating ${Object.keys(enabledTools).length} enabled tools for ${window.location.href}`
-  );
-
   const toolsToInject: ToolToInject[] = [];
   const newToolNames = new Set<string>();
   const currentUrl = new URL(window.location.href);
@@ -117,41 +113,25 @@ async function evaluateAndInjectTools() {
   for (const toolRef of Object.values(enabledTools) as StoredTool[]) {
     // Check if tool's source is enabled
     if (!enabledSourceUrls.has(toolRef.sourceUrl)) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: source "${toolRef.sourceUrl}" is disabled`
-      );
       continue;
     }
 
     // Look up tool data from unified toolCache
     const cached = toolCache[toolRef.sourceUrl]?.[toolRef.name];
     if (!cached) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: not found in toolCache`
-      );
       continue;
     }
 
     if (
       !(cached.tool.filters ?? []).every((f) => matchesFilter(f, currentUrl))
     ) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" skipped: filter mismatch for ${window.location.href}`
-      );
       continue;
     }
 
     // Use tool name as the identifier
     const toolId = toolRef.name;
     if (!currentlyRegisteredTools.has(toolId)) {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" will be injected (domain, path, and query match)`
-      );
       toolsToInject.push({toolId, source: cached.source});
-    } else {
-      console.log(
-        `[WebMCP] Tool "${toolRef.name}" already registered, skipping`
-      );
     }
     newToolNames.add(toolId);
   }

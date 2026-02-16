@@ -83,10 +83,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab.id;
 
   if (message.type === 'WEBMCP_INJECT_SCRIPT') {
-    console.log(`[WebMCP] Injecting polyfill script into tab ${tabId}`);
     injectUserScript(tabId)
       .then((result) => {
-        console.log(`[WebMCP] Polyfill injection complete for tab ${tabId}`);
         sendResponse(result);
       })
       .catch((error) => {
@@ -99,10 +97,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'WEBMCP_INJECT_TOOLS') {
     const tools = message.tools as ToolToInject[];
     const toolNames = tools.map((t) => t.toolId);
-    console.log(
-      `[WebMCP] Injecting ${tools.length} tools into tab ${tabId}:`,
-      toolNames
-    );
 
     // Initialize or update tab state with injected tools
     (async () => {
@@ -126,7 +120,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       const result = await injectTools(tabId, tools);
-      console.log(`[WebMCP] Tool injection complete for tab ${tabId}`);
       sendResponse(result);
     })().catch((error) => {
       console.error(`[WebMCP] Tool injection failed:`, error);
@@ -258,9 +251,6 @@ function startBrowserControl(): void {
   if (browserControlEnabled) return;
   browserControlEnabled = true;
 
-  console.log(
-    `${BC_LOG_PREFIX} Starting - scanning ports ${WS_PORT_START}-${WS_PORT_END}`
-  );
   startDiscovery();
   startKeepalive();
 }
@@ -269,7 +259,6 @@ function stopBrowserControl(): void {
   if (!browserControlEnabled) return;
   browserControlEnabled = false;
 
-  console.log(`${BC_LOG_PREFIX} Stopping`);
   stopDiscovery();
   stopKeepalive();
 
@@ -304,20 +293,17 @@ async function connectToPort(port: number): Promise<void> {
   const ws = new WebSocket(`ws://localhost:${port}`);
 
   ws.onopen = () => {
-    console.log(`${BC_LOG_PREFIX} Connected to server on port ${port}`);
     wsConnections.set(port, ws);
     broadcastStatusUpdate();
   };
 
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data) as ServerMessage;
-    console.log(`${BC_LOG_PREFIX} Received from port ${port}:`, message);
     handleServerMessage(message, port);
   };
 
   ws.onclose = () => {
     if (wsConnections.has(port)) {
-      console.log(`${BC_LOG_PREFIX} Disconnected from server on port ${port}`);
       wsConnections.delete(port);
       broadcastStatusUpdate();
     }
@@ -609,11 +595,6 @@ async function handleCallTool(
   args: Record<string, unknown>,
   sessionId?: string
 ): Promise<void> {
-  console.log(
-    `${BC_LOG_PREFIX} Calling tool "${toolName}" on tab ${tabId}`,
-    args
-  );
-
   try {
     const code = `
       (async () => {
