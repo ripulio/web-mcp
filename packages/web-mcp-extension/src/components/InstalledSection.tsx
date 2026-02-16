@@ -34,7 +34,10 @@ function InstalledGroupCard({group}: {group: InstalledGroup}) {
   const handleUpdate = async () => {
     setUpdating(true);
     try {
-      await updateGroup(groupId);
+      await Promise.all([
+        updateGroup(groupId),
+        new Promise((r) => setTimeout(r, 600))
+      ]);
     } finally {
       setUpdating(false);
     }
@@ -60,7 +63,7 @@ function InstalledGroupCard({group}: {group: InstalledGroup}) {
             <span class="fetching">Loading...</span>
           ) : (
             <>
-              {hasUpdate && (
+              {(hasUpdate || updating) && (
                 <button
                   class="update-badge"
                   onClick={handleUpdate}
