@@ -71,13 +71,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === 'BROWSER_CONTROL_DETECT_SERVERS') {
-    detectServers().then((ports) => {
-      sendResponse({detectedPorts: ports});
-    });
-    return true;
-  }
-
   // All other messages require a tab context
   if (!sender.tab?.id) return;
   const tabId = sender.tab.id;
@@ -227,16 +220,25 @@ const BC_LOG_PREFIX = '[WebMCP Browser Control]';
 const WS_PORT_START = 8765;
 const WS_PORT_END = 8785;
 const KEEPALIVE_INTERVAL = 20 * 1000; // 20 seconds
-const DISCOVERY_INTERVAL = 5 * 1000; // 5 seconds
+const DISCOVERY_INTERVAL_MIN = 5 * 1000; // 5 seconds (initial)
+const DISCOVERY_INTERVAL_MAX = 60 * 1000; // 60 seconds (max backoff)
 
 // WebSocket connection state
 const wsConnections = new Map<number, WebSocket>();
 let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
-let discoveryInterval: ReturnType<typeof setInterval> | null = null;
+let discoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+let discoveryDelay = DISCOVERY_INTERVAL_MIN;
+let detectionTimeout: ReturnType<typeof setTimeout> | null = null;
+let detectionDelay = DISCOVERY_INTERVAL_MIN;
 let browserControlEnabled = false;
+const lastDetectedPorts = new Set<number>();
 
 // Initialize browser control based on stored settings
 async function initBrowserControl(): Promise<void> {
+  // Always start lightweight detection so the panel can show
+  // the "server detected" banner even when browser control is off
+  startDetection();
+
   const result = await chrome.storage.local.get<{
     webmcpSettings: WebMCPSettings;
   }>(['webmcpSettings']);
@@ -251,6 +253,8 @@ function startBrowserControl(): void {
   if (browserControlEnabled) return;
   browserControlEnabled = true;
 
+  // Full discovery supersedes lightweight detection
+  stopDetection();
   startDiscovery();
   startKeepalive();
 }
@@ -267,6 +271,10 @@ function stopBrowserControl(): void {
     ws.close();
   }
   wsConnections.clear();
+
+  // Resume lightweight detection for the panel banner
+  startDetection();
+  broadcastStatusUpdate();
 }
 
 async function isPortResponding(port: number): Promise<boolean> {
@@ -294,6 +302,7 @@ async function connectToPort(port: number): Promise<void> {
 
   ws.onopen = () => {
     wsConnections.set(port, ws);
+    resetDiscoveryBackoff();
     broadcastStatusUpdate();
   };
 
@@ -316,6 +325,7 @@ async function connectToPort(port: number): Promise<void> {
 }
 
 async function discoverServers(): Promise<void> {
+  const connectionsBefore = wsConnections.size;
   const promises: Promise<void>[] = [];
   for (let port = WS_PORT_START; port <= WS_PORT_END; port++) {
     if (!wsConnections.has(port)) {
@@ -323,17 +333,44 @@ async function discoverServers(): Promise<void> {
     }
   }
   await Promise.all(promises);
+
+  // Update detected ports from connected state
+  updateDetectedPorts();
+
+  // Back off if no new connections were made
+  if (wsConnections.size <= connectionsBefore) {
+    discoveryDelay = Math.min(discoveryDelay * 2, DISCOVERY_INTERVAL_MAX);
+  }
+}
+
+function resetDiscoveryBackoff(): void {
+  discoveryDelay = DISCOVERY_INTERVAL_MIN;
+  // Restart discovery loop with reset delay
+  if (browserControlEnabled && discoveryTimeout) {
+    clearTimeout(discoveryTimeout);
+    scheduleDiscovery();
+  }
+}
+
+function scheduleDiscovery(): void {
+  discoveryTimeout = setTimeout(async () => {
+    await discoverServers();
+    if (browserControlEnabled) {
+      scheduleDiscovery();
+    }
+  }, discoveryDelay);
 }
 
 function startDiscovery(): void {
+  discoveryDelay = DISCOVERY_INTERVAL_MIN;
   discoverServers();
-  discoveryInterval = setInterval(discoverServers, DISCOVERY_INTERVAL);
+  scheduleDiscovery();
 }
 
 function stopDiscovery(): void {
-  if (discoveryInterval) {
-    clearInterval(discoveryInterval);
-    discoveryInterval = null;
+  if (discoveryTimeout) {
+    clearTimeout(discoveryTimeout);
+    discoveryTimeout = null;
   }
 }
 
@@ -370,7 +407,28 @@ function wsBroadcast(message: ExtensionMessage): void {
   }
 }
 
-async function detectServers(): Promise<number[]> {
+function updateDetectedPorts(): void {
+  // Connected ports are also detected
+  const ports = new Set<number>(wsConnections.keys());
+  // Merge with last probe results
+  for (const port of lastDetectedPorts) {
+    ports.add(port);
+  }
+  const sorted = Array.from(ports).sort((a, b) => a - b);
+  const previous = Array.from(lastDetectedPorts).sort((a, b) => a - b);
+  lastDetectedPorts.clear();
+  for (const p of sorted) lastDetectedPorts.add(p);
+
+  // Broadcast if detection changed
+  if (sorted.join(',') !== previous.join(',')) {
+    broadcastStatusUpdate();
+  }
+}
+
+// Lightweight always-on detection (HTTP probe only, no WebSocket)
+// Runs even when browser control is disabled so the panel can show
+// the "server detected" banner.
+async function runDetectionProbe(): Promise<void> {
   const ports: number[] = [];
   const promises: Promise<void>[] = [];
   for (let port = WS_PORT_START; port <= WS_PORT_END; port++) {
@@ -381,14 +439,46 @@ async function detectServers(): Promise<number[]> {
     );
   }
   await Promise.all(promises);
-  return ports.sort((a, b) => a - b);
+
+  const previousSize = lastDetectedPorts.size;
+  lastDetectedPorts.clear();
+  for (const p of ports) lastDetectedPorts.add(p);
+
+  // Back off if nothing changed
+  if (ports.length === 0 && previousSize === 0) {
+    detectionDelay = Math.min(detectionDelay * 2, DISCOVERY_INTERVAL_MAX);
+  } else if (ports.length !== previousSize) {
+    detectionDelay = DISCOVERY_INTERVAL_MIN;
+  }
+
+  broadcastStatusUpdate();
+}
+
+function scheduleDetection(): void {
+  detectionTimeout = setTimeout(async () => {
+    await runDetectionProbe();
+    scheduleDetection();
+  }, detectionDelay);
+}
+
+function startDetection(): void {
+  detectionDelay = DISCOVERY_INTERVAL_MIN;
+  runDetectionProbe();
+  scheduleDetection();
+}
+
+function stopDetection(): void {
+  if (detectionTimeout) {
+    clearTimeout(detectionTimeout);
+    detectionTimeout = null;
+  }
 }
 
 function getBrowserControlStatus(): BrowserControlStatus {
   return {
     enabled: browserControlEnabled,
     connectedPorts: Array.from(wsConnections.keys()),
-    detectedPorts: []
+    detectedPorts: Array.from(lastDetectedPorts).sort((a, b) => a - b)
   };
 }
 
