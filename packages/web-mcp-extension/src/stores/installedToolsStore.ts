@@ -7,9 +7,13 @@ import type {
   ToolCache,
   EnabledTools
 } from '../shared.js';
+import {fetchGroup, refreshToolCache} from '../tool-registry.js';
 
 // Core signal
 export const installedGroups = signal<InstalledGroups>({});
+
+// Update checking signals
+export const groupUpdates = signal<Record<string, GroupResponse>>({});
 
 // Load from storage
 export async function loadInstalledGroups(): Promise<void> {
@@ -25,13 +29,15 @@ export async function installGroup(
   sourceUrl: string,
   baseUrl: string
 ): Promise<void> {
-  const groupId = `${sourceUrl}:${group.name}`;
+  const groupId = `${sourceUrl}:${group.id}`;
 
   const installedGroup: InstalledGroup = {
+    id: group.id,
     name: group.name,
     sourceUrl,
     baseUrl,
     description: group.description,
+    revision: group.revision,
     tools: group.tools
   };
 
@@ -56,7 +62,7 @@ export async function uninstallGroup(groupId: string): Promise<void> {
   const enabledTools = enabledResult.enabledToolGroups || {};
   const updatedEnabled: EnabledTools = {};
   for (const [compositeId, storedTool] of Object.entries(enabledTools)) {
-    const toolGroupId = `${storedTool.sourceUrl}:${group.name}`;
+    const toolGroupId = `${storedTool.sourceUrl}:${group.id}`;
     if (toolGroupId !== groupId) {
       updatedEnabled[compositeId] = storedTool;
     }
@@ -110,4 +116,61 @@ export function getInstalledTool(
     }
   }
   return null;
+}
+
+export async function checkForUpdates(): Promise<void> {
+  const groups = Object.entries(installedGroups.value);
+  if (groups.length === 0) return;
+
+  const results = await Promise.allSettled(
+    groups.map(async ([groupId, installed]) => {
+      const remoteGroup = await fetchGroup(installed.baseUrl, installed.id);
+      if (
+        remoteGroup.revision !== undefined &&
+        remoteGroup.revision !== installed.revision
+      ) {
+        return {groupId, remoteGroup};
+      }
+      return null;
+    })
+  );
+
+  const updates: Record<string, GroupResponse> = {};
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value) {
+      updates[result.value.groupId] = result.value.remoteGroup;
+    }
+  }
+
+  groupUpdates.value = updates;
+}
+
+// Update an installed group to the latest remote revision
+export async function updateGroup(groupId: string): Promise<void> {
+  const remoteGroup = groupUpdates.value[groupId];
+  const installed = installedGroups.value[groupId];
+  if (!remoteGroup || !installed) return;
+
+  await installGroup(remoteGroup, installed.sourceUrl, installed.baseUrl);
+
+  // If group was enabled, refresh tool sources
+  const enabledResult = await chrome.storage.local.get<{
+    enabledToolGroups: EnabledTools;
+  }>(['enabledToolGroups']);
+  const enabledTools = enabledResult.enabledToolGroups || {};
+  const hadEnabledTools = remoteGroup.tools.some(
+    (t) => enabledTools[`${installed.sourceUrl}:${t.id}`] !== undefined
+  );
+
+  if (hadEnabledTools) {
+    await refreshToolCache(
+      installed.sourceUrl,
+      installed.baseUrl,
+      remoteGroup.tools
+    );
+  }
+
+  // Remove from updates
+  const {[groupId]: _, ...rest} = groupUpdates.value;
+  groupUpdates.value = rest;
 }

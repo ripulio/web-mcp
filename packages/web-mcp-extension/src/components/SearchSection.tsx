@@ -21,7 +21,7 @@ function SearchGroupCard({
   sourceUrl: string;
   baseUrl: string;
 }) {
-  const groupId = `${sourceUrl}:${group.name}`;
+  const groupId = `${sourceUrl}:${group.id}`;
   const installed = isGroupInstalled(groupId);
   const [expanded, setExpanded] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -105,7 +105,7 @@ export function SearchSection() {
         filteredRegistry.value.map((source) =>
           source.groups.map((group) => (
             <SearchGroupCard
-              key={`${source.sourceUrl}:${group.name}`}
+              key={`${source.sourceUrl}:${group.id}`}
               group={group}
               sourceUrl={source.sourceUrl}
               baseUrl={source.baseUrl}
