@@ -1,5 +1,17 @@
 # @ripulio/web-mcp-extension
 
+## 0.3.0
+
+### Minor Changes
+
+- 4c8eaaa: Add ability to update a tool group.
+
+### Patch Changes
+
+- 16890dd: Add backoff strategy to MCP server discovery.
+- eb05c72: Remove all non-error logs to tidy up noise coming from the extension.
+- 4921a18: Exclude internal tabs from injection logic.
+
 ## 0.2.3
 
 ### Patch Changes
