@@ -14,6 +14,8 @@ import {
   ServerMessageType
 } from './shared.js';
 
+const HTTP_PATTERN = /^https?:\/\//i;
+
 interface ToolToInject {
   toolId: string;
   source: string;
@@ -72,8 +74,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // All other messages require a tab context
-  if (!sender.tab?.id) return;
-  const tabId = sender.tab.id;
+  const tabId = sender.tab?.id;
+
+  if (!tabId || tabId < 0 || !sender.url || !HTTP_PATTERN.test(sender.url)) {
+    return;
+  }
 
   if (message.type === 'WEBMCP_INJECT_SCRIPT') {
     injectUserScript(tabId)
