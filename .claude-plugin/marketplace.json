@@ -21,18 +21,6 @@
       "keywords": ["browser", "chrome", "mcp", "automation", "tabs", "web"],
       "category": "integration",
       "license": "MIT"
-    },
-    {
-      "name": "webmcp-skill",
-      "source": "./claude-plugins/webmcp-skill",
-      "description": "Instructions for using navigator.modelContext API in web pages",
-      "version": "0.0.1",
-      "author": {
-        "name": "ripulio"
-      },
-      "keywords": ["webmcp", "skill", "browser", "navigator.modelContext"],
-      "category": "skill",
-      "license": "MIT"
     }
   ]
 }
