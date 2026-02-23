@@ -1,11 +1,11 @@
 ---
 name: webmcp-direct-page-tools
-description: Use this to execute WebMCP tools on the current web page via `navigator.modelContext` when page-context JavaScript is available.
+description: Use this to execute WebMCP tools on a webpage in a browser via `navigator.modelContext` when page-context JavaScript is available.
 ---
 
 # WebMCP Direct Page Tools
 
-Use this to perform actions on a page you already have open by calling that page's WebMCP tools through `navigator.modelContext`.
+Use this to perform actions on a webpage in a browser by calling that page's WebMCP tools through `navigator.modelContext`.
 
 ## Prerequisites
 
