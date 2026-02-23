@@ -1,11 +1,11 @@
 ---
 name: webmcp-extension-websocket-protocol
-description: Communicate directly with the installed WebMCP browser extension by running a local WebSocket server that speaks the extension protocol.
+description: Use this to browse the web, control browser tabs, and execute WebMCP actions through the installed browser extension protocol.
 ---
 
 # WebMCP Extension WebSocket Protocol
 
-Use this skill for direct browser control over the extension protocol.
+Use this to control browser tabs and execute WebMCP actions across pages through the extension protocol.
 
 ## Script-first quickstart
 
