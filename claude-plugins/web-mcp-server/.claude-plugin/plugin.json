@@ -1,7 +1,7 @@
 {
   "name": "ripul-webmcp",
-  "version": "0.0.3",
-  "description": "An MCP server that lets Claude Code control Chrome browsers. Open tabs, interact with pages, and use page-specific tools exposed via navigator.modelContext.",
+  "version": "0.1.2",
+  "description": "WebMCP integration for Claude Code: MCP browser control plus bundled extension-mode and page-tool skills.",
   "author": {
     "name": "ripulio",
     "url": "https://github.com/ripulio"
@@ -15,5 +15,6 @@
       "command": "npx",
       "args": ["-y", "@ripulio/web-mcp-server@0.1.0", "--stdio"]
     }
-  }
+  },
+  "skills": "./skills/"
 }

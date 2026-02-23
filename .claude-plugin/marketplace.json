@@ -6,32 +6,20 @@
   },
   "metadata": {
     "description": "Open source tooling for the W3C WebMCP proposal",
-    "version": "0.0.3",
+    "version": "0.1.2",
     "repository": "https://github.com/ripulio/web-mcp"
   },
   "plugins": [
     {
       "name": "ripul-webmcp",
       "source": "./claude-plugins/web-mcp-server",
-      "description": "An MCP server that lets Claude Code control Chrome browsers. Open tabs, interact with pages, and use page-specific tools exposed via navigator.modelContext.",
-      "version": "0.0.3",
+      "description": "WebMCP integration for Claude Code: MCP browser control plus bundled extension-mode and page-tool skills.",
+      "version": "0.1.2",
       "author": {
         "name": "ripulio"
       },
       "keywords": ["browser", "chrome", "mcp", "automation", "tabs", "web"],
       "category": "integration",
-      "license": "MIT"
-    },
-    {
-      "name": "webmcp-skill",
-      "source": "./claude-plugins/webmcp-skill",
-      "description": "Instructions for using navigator.modelContext API in web pages",
-      "version": "0.0.1",
-      "author": {
-        "name": "ripulio"
-      },
-      "keywords": ["webmcp", "skill", "browser", "navigator.modelContext"],
-      "category": "skill",
       "license": "MIT"
     }
   ]
