@@ -33,6 +33,6 @@
     "webmcp-polyfill": "^0.0.2"
   },
   "dependencies": {
-    "@preact/signals": "^2.7.1"
+    "@preact/signals": "^2.8.1"
   }
 }
