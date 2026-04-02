@@ -2,7 +2,10 @@ import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
-  ListToolsRequestSchema
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListResourceTemplatesRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import {getTools} from './tools.js';
 import {getState} from './state.js';
@@ -16,6 +19,7 @@ import {
   DEFAULT_SESSION_ID
 } from './extension-client.js';
 import {createSession, startSessionCleanup} from './session.js';
+import {setResourcesChangedCallback} from './message-handler.js';
 
 // Auto-connect to extension if not already connected
 async function ensureConnected(): Promise<void> {
@@ -141,7 +145,8 @@ const server = new Server(
   },
   {
     capabilities: {
-      tools: {}
+      tools: {},
+      resources: {listChanged: true}
     }
   }
 );
@@ -184,6 +189,86 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       isError: true
     };
   }
+});
+
+// Handle resources/list requests
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  await ensureConnected();
+
+  const state = getState();
+  const resources = Array.from(state.tabs.values()).map((tab) => ({
+    uri: `browser://tab/${tab.id}`,
+    name: tab.title || `Tab ${tab.id}`,
+    description: `Browser tab: ${tab.url}`,
+    mimeType: 'application/json'
+  }));
+
+  return {resources};
+});
+
+// Handle resources/read requests
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  await ensureConnected();
+
+  const {uri} = request.params;
+  const match = uri.match(/^browser:\/\/tab\/(\d+)$/);
+  if (!match) {
+    throw new Error(`Invalid resource URI: ${uri}`);
+  }
+
+  const tabId = parseInt(match[1], 10);
+  const state = getState();
+  const tab = state.tabs.get(tabId);
+  if (!tab) {
+    throw new Error(`Tab ${tabId} not found`);
+  }
+
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify(
+          {
+            id: tab.id,
+            title: tab.title,
+            url: tab.url,
+            tools: tab.tools.map((t) => ({
+              name: t.name,
+              description: t.description
+            }))
+          },
+          null,
+          2
+        )
+      }
+    ]
+  };
+});
+
+// Handle resources/templates/list requests
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  return {
+    resourceTemplates: [
+      {
+        uriTemplate: 'browser://tab/{tabId}',
+        name: 'Browser Tab',
+        description:
+          'A browser tab identified by its Chrome tab ID. Returns tab metadata including title, URL, and available tools.',
+        mimeType: 'application/json'
+      }
+    ]
+  };
+});
+
+// Notify MCP clients when the tab list changes
+setResourcesChangedCallback(() => {
+  server.sendResourceListChanged().catch((err) => {
+    console.error(
+      'Failed to send resource list changed notification:',
+      err.message
+    );
+  });
 });
 
 // Start the server

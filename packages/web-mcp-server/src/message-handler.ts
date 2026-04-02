@@ -17,6 +17,12 @@ import {
 
 const DEFAULT_SESSION_ID = 'default';
 
+let onResourcesChanged: (() => void) | null = null;
+
+export function setResourcesChangedCallback(callback: () => void): void {
+  onResourcesChanged = callback;
+}
+
 export function rejectAllSessionPendingOps(
   session: Session,
   reason: string
@@ -86,15 +92,18 @@ export function handleExtensionMessage(message: ExtensionMessage): void {
         });
         session.pendingConnect = null;
       }
+      onResourcesChanged?.();
       break;
     }
 
     case ExtensionMessageType.DISCONNECTED:
       setConnected(false);
+      onResourcesChanged?.();
       break;
 
     case ExtensionMessageType.TAB_CREATED: {
       addTab(message.tab);
+      onResourcesChanged?.();
       // Resolve pending openTab call if requestId matches
       if (message.requestId) {
         const reqSessionId =
@@ -114,10 +123,12 @@ export function handleExtensionMessage(message: ExtensionMessage): void {
 
     case ExtensionMessageType.TAB_UPDATED:
       updateTab(message.tab);
+      onResourcesChanged?.();
       break;
 
     case ExtensionMessageType.TAB_CLOSED: {
       removeTab(message.tabId);
+      onResourcesChanged?.();
       // Check all sessions for pending close operation
       for (const session of getAllSessions()) {
         const pending = session.pendingCloseTabs.get(message.tabId);
@@ -196,6 +207,7 @@ export function handleExtensionMessage(message: ExtensionMessage): void {
 
 export function handleDisconnect(): void {
   setConnected(false);
+  onResourcesChanged?.();
   for (const session of getAllSessions()) {
     rejectAllSessionPendingOps(session, 'Connection closed');
   }
